@@ -1,0 +1,63 @@
+# The suite image channel — publishes ghcr.io/aps-conecta/*:<suite tag> as byte-identical
+# copies of the upstream lockstep digests. The suite tag IS the channel — never a raw digest
+# (every sibling resolves %AIO_CHANNEL% from it; one tag, 20 images, zero fork logic).
+#
+# PHASE-0 SEED (manual dispatch): the v0.2.0 suite tags ride the manual
+# `docker buildx imagetools create` mechanics — identical upstream digest copies, published
+# BEFORE the gestion tag push (the release manifest's --emit resolves them from the registry).
+# The installer program's Phase 6 grows this file: scripts/retag.sh extraction, the
+# tag-completeness matrix as a standing gate, the boot smoke. A published tag's digests never
+# move — the pre-check refuses any re-push, loudly.
+name: Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "The suite tag to publish (D12: it equals the gestion release tag)"
+        required: true
+
+permissions:
+  packages: write
+  contents: read
+
+concurrency:
+  group: images-${{ github.event.inputs.release_tag }}
+
+jobs:
+  retag:
+    name: Publish the suite tags over the current lockstep digest set
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish and verify the 20 suite tags
+        run: |
+          set -eu
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # The sibling list is read out of php/containers.json — the single source; upstream's
+          # 20th container auto-includes (patch 010's own "keep it generated" rule).
+          names="$(jq -r '."aio_services_v1"[].image' php/containers.json \
+                     | sed 's|^ghcr.io/nextcloud-releases/||' | sort -u)"
+          n="$(printf '%s\n' "$names" | grep -c .)"
+          [ "$n" -eq 19 ] \
+            || { echo "FATAL: $n siblings in containers.json — expected 19 (the list moved; re-measure)"; exit 1; }
+          names="all-in-one $names"   # the mastercontainer + the 19 siblings = 20
+          ok=0
+          for name in $names; do
+            # A published tag's digests never move — suite tags are immutable; refuse any re-push.
+            if docker buildx imagetools inspect "ghcr.io/aps-conecta/$name:$TAG" >/dev/null 2>&1; then
+              echo "FATAL: ghcr.io/aps-conecta/$name:$TAG is already published — suite tags never move"; exit 1
+            fi
+            upstream="$(docker buildx imagetools inspect "ghcr.io/nextcloud-releases/$name:latest" --format '{{.Manifest.Digest}}')"
+            docker buildx imagetools create --tag "ghcr.io/aps-conecta/$name:$TAG" "ghcr.io/nextcloud-releases/$name:latest" >/dev/null
+            published="$(docker buildx imagetools inspect "ghcr.io/aps-conecta/$name:$TAG" --format '{{.Manifest.Digest}}')"
+            [ "$published" = "$upstream" ] \
+              || { echo "FATAL: $name published $published but the upstream lockstep says $upstream"; exit 1; }
+            printf '  %-24s %s\n' "$name" "$published"
+            ok=$((ok + 1))
+          done
+          echo "suite tags published and verified: $ok/20 under ghcr.io/aps-conecta/*:$TAG"
+          echo "(org chore: the 20 packages land PRIVATE on first push — the flip to public"
+          echo " precedes any real release tag; record it in FINDINGS.md)"
