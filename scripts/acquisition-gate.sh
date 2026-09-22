@@ -98,6 +98,9 @@ fi
 row 020 "the app store is baked off — NC_appstoreenabled=\"0\" ENV in Containers/nextcloud/Dockerfile" \
   grep -q 'NC_appstoreenabled="0"' "$TREE/Containers/nextcloud/Dockerfile"
 
+row 015 "the eurooffice documentserver base pins the suite's certified pairing (DS 9.3.4 ↔ connector 11.0.5 — R3's set-certified pin; re-cut from the v0.2.0 choreography's main commit so main stays the byte-identical mirror)" \
+  grep -q 'documentserver:v9.3.4' "$TREE/Containers/eurooffice/Dockerfile"
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1
