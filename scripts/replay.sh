@@ -93,6 +93,19 @@ DECLARED_MOD="readme.md"
 strip_declaration() {  # FILE — the marker-delimited fork declaration, deleted (the parity form)
   sed '/^<!-- aps-fork-declaration-start -->$/,/^<!-- aps-fork-declaration-end -->$/d' "$@"
 }
+
+# (P45, landing flow) patch 090's queue is the first to modify .github/workflows/**, and the
+# GITHUB_TOKEN can NEVER push workflow files — the aps/main force-push (and any sync push whose
+# merge carries upstream workflow changes) needs a PAT. When APS_BOT_PAT is present it carries
+# every publish push; without it the plain remote answers (fine until a workflow file moves).
+push_target() {
+  if [ -n "${APS_BOT_PAT:-}" ]; then
+    local repo="${GITHUB_REPOSITORY:-$(git remote get-url "$FORK" | sed 's#.*github.com[:/]##; s#\\.git$##')}"
+    printf 'https://x-access-token:%s@github.com/%s.git' "$APS_BOT_PAT" "$repo"
+  else
+    printf '%s' "$FORK"
+  fi
+}
 allowlisted() {  # PATH
   case "$1" in
     .github/workflows/images.yml|.github/workflows/replay.yml|.codespellrc|BUGS.md) return 0 ;;
@@ -219,7 +232,7 @@ cmd_replay() {
   git -C "$WT" add -A
   if git -C "$WT" diff --cached --quiet; then
     say "queue produced no tree changes — aps/main = upstream ${base:0:12}"
-    git push --force "$FORK" "$base:refs/heads/$APS_BRANCH" \
+    git push --force "$(push_target)" "$base:refs/heads/$APS_BRANCH" \
       || die "cannot push aps/main (upstream tip) to $FORK — check contents: write"
   else
     git -C "$WT" -c user.name="aps-replay" -c user.email="replay@aps-conecta.invalid" \
@@ -227,7 +240,7 @@ cmd_replay() {
     # -C "$WT": HEAD is the WORKTREE's replay commit — a bare push would run in this checkout's
     # cwd and publish MAIN's tip instead (the de-risk caught exactly this). The base push above
     # is sha-based and cwd-independent; this one names a ref, so it must run in the worktree.
-    git -C "$WT" push --force "$FORK" "HEAD:refs/heads/$APS_BRANCH" \
+    git -C "$WT" push --force "$(push_target)" "HEAD:refs/heads/$APS_BRANCH" \
       || die "cannot force-push aps/main to $FORK — aps/main is CI output; main itself is never forced"
   fi
   echo "REPLAY: ${n} patch(es) over upstream ${base:0:12} -> $APS_BRANCH (worktree kept at $WT for validate/gates)"

@@ -86,7 +86,13 @@ jobs:
       - name: Publish the sync (no-op when upstream has not moved)
         if: github.event_name != 'pull_request'
         run: |
-          if ! git push origin main; then
+          # (P45) a sync whose merge carries upstream workflow changes needs the PAT too
+          if [ -n "${APS_BOT_PAT:-}" ]; then
+            remote="https://x-access-token:${APS_BOT_PAT}@github.com/${GITHUB_REPOSITORY}.git"
+          else
+            remote=origin
+          fi
+          if ! git push "$remote" main; then
             echo "main moved mid-run (a fork-infra PR merged) — re-run this workflow; nothing was lost" >&2
             exit 1
           fi
@@ -96,6 +102,7 @@ jobs:
         run: bash scripts/replay.sh replay
         env:
           REPLAY_PUSH: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+          APS_BOT_PAT: ${{ secrets.APS_BOT_PAT }}   # (P45) carries pushes that move workflow files
       - name: Upstream validators I — codespell, docker-lint, json-validator
         run: bash scripts/replay.sh validate .aps-replay-tree
       - name: Upstream validator II — twig-lint (needs PHP; upstream's own setup)
