@@ -229,6 +229,143 @@ row 060 "the es-CL sweep landed on every wizard surface — per-file es-CL senti
 row 060 "the log page's toggle words agree between twig and JS — log.twig's static labels equal log-load.js's swap labels" \
   log_toggle_consistent
 
+reskin_identity() {  # MODE — walk 070's identity table (the <title>/h1/h2 lockups). absent = upstream's
+  # product name must be gone from the identity surface; present = ours must be there. The sweep
+  # (060) translated these headings and deliberately kept the upstream product name (its locked
+  # keep-list); the reskin (070) renames the identity surfaces — the boundary recorded in the
+  # header's "the <title>/h1 swap is the reskin's, not the sweep's". Nominative body copy
+  # ("su Nextcloud", the doc links) is deliberately NOT this row's scope: that is slice 23's
+  # fork-declaration audit surface, not the identity swap's.
+  local mode="$1" f old new fail=0
+  while IFS='|' read -r f old new; do
+    [ -f "$TREE/$f" ] || { echo "reskin_identity: no such file: $f" >&2; return 1; }
+    if [ "$mode" = absent ]; then
+      if grep -nF "$old" "$TREE/$f" >/dev/null; then
+        grep -nF "$old" "$TREE/$f" | head -3 | sed 's/^/  /' >&2
+        echo "  upstream identity residue in $f — the reskin did not land there" >&2; fail=1
+      fi
+    else
+      grep -qF "$new" "$TREE/$f" || { echo "  no APS identity in $f — the rename is missing" >&2; fail=1; }
+    fi
+  done <<'EOF'
+php/templates/layout.twig|<title>AIO</title>|<title>APS Conecta AIO — Instalador</title>
+php/templates/log.twig|<title>AIO</title>|<title>APS Conecta AIO — Instalador</title>
+php/templates/containers.twig|<h1>Nextcloud AIO v|<h1>APS Conecta AIO v
+php/templates/login.twig|Inicio de sesión de Nextcloud AIO|Inicio de sesión de APS Conecta AIO
+php/templates/already-installed.twig|Nextcloud All-In-One ya está instalado|APS Conecta AIO ya está instalado
+php/templates/setup.twig|Configuración de All-in-One|Configuración de APS Conecta AIO
+EOF
+  [ "$fail" -eq 0 ]
+}
+
+dark_mode_gone() {  # the toggle is deleted and nothing can re-apply a stale dark key: zero
+  # button/icon refs in templates and CSS, zero [data-theme="dark"] rules left, the toggle
+  # script file gone — and the one-shot localStorage clear present in apply-theme.js (the
+  # swap that fixes every load surface at once; the PHP heredoc's reference to that file
+  # stays byte-identical and inert, so it is excluded by construction like every zero-PHP
+  # surface). A stale 'dark' key with the dark rules deleted is inert the moment the new
+  # bytes load; the removeItem clears it for every load after that.
+  local hits=0
+  grep -rnHE 'theme-toggle|theme-icon' "$TREE/php/templates" "$TREE/php/public/style.css" && hits=$((hits+1))
+  grep -nHE '\[data-theme="dark"\]' "$TREE/php/public/style.css" && hits=$((hits+1))
+  [ -e "$TREE/php/public/toggle-dark-mode.js" ] && { echo "  still present: toggle-dark-mode.js" >&2; hits=$((hits+1)); }
+  grep -q "localStorage.removeItem('theme')" "$TREE/php/public/apply-theme.js" \
+    || { echo "  the one-shot theme clear is missing from apply-theme.js" >&2; hits=$((hits+1)); }
+  [ "$hits" -eq 0 ]
+}
+
+reskin_assets_swapped() {  # the wizard's art is the fork's: logo lockup, favicon and background
+  # are ours; every upstream asset the reskin replaces is gone. The logo keeps id="logo" (the
+  # header and lockup <use> refs) and gains id="wordmark" — a renamed id would render nothing
+  # on three views, exactly the class this floor exists to catch. The <use> floor counts ALL
+  # refs — 7 across 4 files (the three big views carry #logo + #wordmark each, the containers
+  # header carries #logo alone) — so a dropped view (−2) AND a dropped single ref (−1) both red.
+  local f n
+  for f in "$TREE/php/public/img/logo.svg" "$TREE/php/public/img/favicon.svg" "$TREE/php/public/img/background.svg"; do
+    [ -f "$f" ] || { echo "  missing: $f" >&2; return 1; }
+  done
+  grep -q 'id="logo"' "$TREE/php/public/img/logo.svg" || { echo '  logo.svg lost id="logo" — the <use> refs would render nothing' >&2; return 1; }
+  grep -q 'id="wordmark"' "$TREE/php/public/img/logo.svg" || { echo '  logo.svg lost id="wordmark"' >&2; return 1; }
+  grep -q 'img/background.svg' "$TREE/php/public/style.css" || { echo "  style.css does not load background.svg" >&2; return 1; }
+  files_absent "$TREE/php/public/img/nextcloud-logo.svg" "$TREE/php/public/img/favicon.png" \
+    "$TREE/php/public/img/jo-myoung-hee-fluid.webp" "$TREE/php/public/img/jo-myoung-hee-fluid-dark.webp" || return 1
+  n="$(grep -ro 'img/logo.svg#' "$TREE/php/templates" | wc -l)"
+  [ "$n" -ge 7 ] || { echo "  only $n img/logo.svg# refs in the templates (floor 7 — a dropped view or a dropped ref reds)" >&2; return 1; }
+}
+
+reskin_tokens() {  # the :root value table carries the brand tokens (names preserved — the inline
+  # SVG and var refs ride them; values swapped per the MAPEO ledger, contrast measured) and the
+  # fonts ship as LOCAL subsets — the wizard never fetches a font from anywhere, which is the
+  # acquisition gate's install-time rule applied to the wizard's own bytes.
+  local css="$TREE/php/public/style.css" fail=0 want
+  while IFS= read -r want; do
+    grep -qF -e "$want" "$css" || { echo "  token missing from :root: $want" >&2; fail=1; }
+  done <<'EOF'
+--color-nextcloud-blue: #7f21fe;
+--color-main-text: #101828;
+--color-border-maxcontrast: #485363;
+--color-error: #ea003e;
+--color-running: #e06f00;
+--color-primary-element: #7f21fe;
+--color-primary-element-hover: #6b01fa;
+--color-primary-element-light-text: #5315a8;
+EOF
+  grep -qF 'font-family: "Fraunces";' "$css" || { echo "  the Fraunces @font-face is missing" >&2; fail=1; }
+  grep -qF 'font-family: "Nunito Sans";' "$css" || { echo "  the Nunito Sans @font-face is missing" >&2; fail=1; }
+  grep -qF 'url("fonts/Fraunces.woff2")' "$css" || { echo "  Fraunces must load the local subset" >&2; fail=1; }
+  grep -qF 'url("fonts/NunitoSans.woff2")' "$css" || { echo "  Nunito Sans must load the local subset" >&2; fail=1; }
+  if [ ! -f "$TREE/php/public/fonts/Fraunces.woff2" ] || [ ! -f "$TREE/php/public/fonts/NunitoSans.woff2" ]; then
+    echo "  the font subset files are missing from php/public/fonts/" >&2; fail=1
+  fi
+  if grep -nE 'url\(.?https?:|@import' "$css"; then
+    echo "  style.css reaches a remote URL — the wizard must ship every byte it renders" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+paso1_card() {  # the handoff card shows the aps-conecta provision command — never a literal
+  # URL or port (the locked dynamic-bind decision: the Provisionador prints its own address
+  # at bind time). containers.twig carried no :808x before this patch, so a literal port can
+  # only arrive with the card — the absence check is the card's own scope.
+  local t="$TREE/php/templates/containers.twig"
+  grep -qF 'id="paso-1-card"' "$t" || { echo "  the Paso-1 handoff card is missing" >&2; return 1; }
+  grep -qF '<code>aps-conecta provision</code>' "$t" || { echo "  the card must show the aps-conecta provision command" >&2; return 1; }
+  if grep -nE ':808[0-9]' "$t"; then
+    echo "  a literal provisioner port leaked into containers.twig — the card must show the command only" >&2; return 1
+  fi
+}
+
+territorio_pending_card() {  # the S12 gate's operator contract, made mechanical: the card is
+  # visible until territorio ships, and removing it without touching this row reds the gate
+  # — the flip can only ever be deliberate (the drift-protection the card needs, since it
+  # is the one piece of shipped markup whose designed lifetime is bounded).
+  local t="$TREE/php/templates/containers.twig"
+  grep -qF 'id="territorio-card"' "$t" || { echo "  the territorio pending card is missing" >&2; return 1; }
+  grep -qF 'pendiente de empaquetado' "$t" || { echo "  the pending-state wording is missing" >&2; return 1; }
+}
+
+
+row 070 "the identity lockups name APS Conecta AIO — titles, h1s and the already-installed h2 carry zero upstream product names (the <title>/h1 swap is the reskin's, not the sweep's)" \
+  reskin_identity absent
+
+row 070 "the identity swap landed — the APS Conecta AIO product name present on every identity surface" \
+  reskin_identity present
+
+row 070 "the dark toggle is gone — button, script, CSS rules and every [data-theme=\"dark\"] block, with the one-shot localStorage clear in apply-theme.js fixing all load surfaces at once" \
+  dark_mode_gone
+
+row 070 "the wizard's assets are the fork's — logo.svg (id=\"logo\" + id=\"wordmark\"), favicon.svg and background.svg present; nextcloud-logo.svg, favicon.png and both upstream webp backgrounds deleted" \
+  reskin_assets_swapped
+
+row 070 "the token table carries the brand values — primary #7f21fe, ink #101828, muted #485363, error #ea003e, gold running dot; Fraunces and Nunito Sans ship as local subsets with zero remote font URLs" \
+  reskin_tokens
+
+row 070 "the Paso-1 handoff card shows the aps-conecta provision command — present, and no literal provisioner port anywhere in containers.twig" \
+  paso1_card
+
+row 070 "the territorio pending card is visible — the S12 gate's operator contract until the tarball ships" \
+  territorio_pending_card
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
