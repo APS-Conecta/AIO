@@ -27,19 +27,21 @@
 #         (index.php's /desec + /api/desec/register, DesecManager) stay as unreachable dead
 #         code per the zero-PHP rule — unreachable because the markup that reached them is
 #         what this patch deletes.
-#   030 — the bake (slice 13): four rows. (1) The bake channel is checksum-gated at build
+#   030 — the bake (slice 13): three rows. (1) The bake channel is checksum-gated at build
 #         time — scripts/bake.sh re-runs gestion's VENDOR sha256 gate before any tarball
 #         enters the image; the tarball BYTES are gestion-side (test.sh:63-70), so this row
 #         pins the MECHANISM to the fork. (2) The suite's skeleton posture is baked —
 #         NC_skeletondirectory="" ENV beside 020's store-off (the compose stack's own key,
 #         compose.yaml: the wizard's admin is created before any phase can write config, and
-#         the NC_ channel is read before config.php). (3) Phase 07's AIA fetch has its
-#         runtime dependency — curl joins the runtime apk set (slice 4's routing: the AIO
-#         runtime shipped no curl and the cert-chain fetch degraded to its skip-warning path
-#         on every clinic). (4) The bake's runtime half is wired — the aps-bake COPY lines
-#         and the ENV_PREFIX wiring grep present in the replayed Dockerfile; without this
-#         row a regenerated 030 that loses them replays green on every other row and ships
-#         an unbaked image (the one silently-unbaked-green path nothing else closes).
+#         the NC_ channel is read before config.php). (3) The bake's runtime half is wired —
+#         the aps-bake COPY lines and the ENV_PREFIX wiring grep present in the replayed
+#         Dockerfile; without this row a regenerated 030 that loses them replays green on
+#         every other row and ships an unbaked image (the one silently-unbaked-green path
+#         nothing else closes). The plan's fourth row — curl in the runtime apk set — was
+#         dropped live per FINDINGS P6: /usr/bin/curl 8.22.0 measured PRESENT in the AIO
+#         runtime (transitive apk dep; phase 07's AIA fetch already imported the GlobalSign
+#         intermediate on the probe), so the premise "the AIO runtime shipped no curl" was
+#         falsified and the explicit apk entry would pin a dependency that already ships.
 #
 # ROUTED (this repo cannot see these channels — recorded so the ledger stays complete, the
 # slice-4 curl→030 precedent): VENDOR sha256s are gestion-side (test.sh:63-70 already gates
@@ -142,6 +144,42 @@ row 051 "the deSEC registration channel is gone from the wizard — zero deSEC r
 
 row 051 "the own-domain flow is intact — the domain form still present (the deletion's positive control)" \
   grep -q 'id="domain"' "$TREE/php/templates/containers.twig"
+
+bake_checksum_gate() {  # the bake channel re-runs gestion's VENDOR gate before anything unpacks
+  # (the mechanism lives on the fork — the BYTES it gates are gestion-side: test.sh:63-70)
+  local f="$REPO_ROOT/scripts/bake.sh"
+  [ -f "$f" ] || { echo "  scripts/bake.sh is missing on the fork — the bake channel is ungated" >&2; return 1; }
+  grep -q 'sha256sum --check --status' "$f" \
+    || { echo "  bake.sh no longer runs sha256sum --check against the VENDOR pins — an ungated bake ships whatever the clone carried" >&2; return 1; }
+  grep -qF 'expected exactly 1' "$f" \
+    || { echo "  bake.sh no longer enforces the one-tarball-per-app guard — a stale second tarball would bake silently" >&2; return 1; }
+  grep -qF 'no longer applies' "$f" \
+    || { echo "  bake.sh no longer carries the three-outcome abort — a drifted patch would fuzz or fail soft" >&2; return 1; }
+}
+
+bake_runtime_wired() {  # the patch's runtime half exists in the replayed tree — the COPY lines that
+  # pull the bake's output into the image and the ENV_PREFIX grep that proves the NC_ channel
+  # is real in the shipped server. Without this row a regenerated 030 that loses these lines
+  # replays green (the three-outcome rule compares the patch to the tree it was cut from) and
+  # every other row stays green while the Images build ships an unbaked image.
+  local f="$TREE/Containers/nextcloud/Dockerfile"
+  [ -f "$f" ] || { echo "  no Dockerfile at '$f'" >&2; return 1; }
+  grep -q '^COPY aps-bake/custom_apps/ /usr/src/nextcloud/custom_apps/' "$f" \
+    || { echo "  the bake's custom_apps COPY line is missing — the image builds without the app set" >&2; return 1; }
+  grep -q '^COPY aps-bake/themes/apsconecta/ /usr/src/nextcloud/themes/apsconecta' "$f" \
+    || { echo "  the bake's theme COPY line is missing — the image builds without the apsconecta theme" >&2; return 1; }
+  grep -q 'ENV_PREFIX' "$f" \
+    || { echo "  the ENV_PREFIX wiring grep is missing — a server bump that renames the NC_ harvest would silently re-enable the store" >&2; return 1; }
+}
+
+row 030 "the bake channel is checksum-gated at build time — scripts/bake.sh re-runs gestion's VENDOR sha256 gate (sha256sum --check against each tarball's VENDOR pin) before any byte enters the image; the tarball bytes themselves are gestion-side (test.sh:63-70), so this row pins the mechanism to the fork" \
+  bake_checksum_gate
+
+row 030 "the suite's skeleton posture is baked — NC_skeletondirectory="" ENV beside 020's store-off (the wizard's admin is created at install time, before any phase can write config; the NC_ channel is read before config.php)" \
+  grep -q 'NC_skeletondirectory=""' "$TREE/Containers/nextcloud/Dockerfile"
+
+row 030 "the bake's runtime half is wired — both aps-bake COPY lines and the ENV_PREFIX wiring grep present in the Dockerfile (a regeneration that drops them would otherwise replay green on every other row and ship an unbaked image — the one silently-unbaked-green path nothing else closes)" \
+  bake_runtime_wired
 
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2

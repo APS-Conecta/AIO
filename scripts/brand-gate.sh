@@ -366,6 +366,21 @@ row 070 "the Paso-1 handoff card shows the aps-conecta provision command — pre
 row 070 "the territorio pending card is visible — the S12 gate's operator contract until the tarball ships" \
   territorio_pending_card
 
+whitelabel_buildtime() {  # bake.sh carries BOTH served-file asserts the office smoke owned — the
+  # rename is enforced where the bytes are made, because the renamed files ship inside the
+  # image where no tree grep can see them. Both halves (office-smoke.sh:37's exact pairs):
+  # each pair absent, or one renamed without the other, reds.
+  local f="$REPO_ROOT/scripts/bake.sh"
+  [ -f "$f" ] || { echo "  scripts/bake.sh is missing on the fork — the bake's build-time half is gone" >&2; return 1; }
+  grep -qF 'lib/AdminSection.php:Euro-Office' "$f" \
+    || { echo "  bake.sh no longer asserts the AdminSection.php rename" >&2; return 1; }
+  grep -qF 'appinfo/info.xml:<name>Euro-Office</name>' "$f" \
+    || { echo "  bake.sh no longer asserts the info.xml <name> rename" >&2; return 1; }
+}
+
+row 030 "the white-label rename is enforced at build time — scripts/bake.sh asserts the served-file strings the office smoke used to own (FRD S3: the greps moved to the bake; the renamed bytes ship inside the image, so this row pins the mechanism to the fork's own script)" \
+  whitelabel_buildtime
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
