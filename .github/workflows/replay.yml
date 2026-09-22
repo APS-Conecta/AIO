@@ -99,7 +99,10 @@ jobs:
       - name: Mirror parity (the D6 fence — PR runs prove the merge commit is parity-clean)
         run: bash scripts/replay.sh parity
       - name: Replay the queue (PR runs prove without publishing)
-        run: bash scripts/replay.sh replay
+        run: |
+          # (P45 diagnostic — length only, the value never prints)
+          echo "APS_BOT_PAT length: ${#APS_BOT_PAT}" >&2
+          bash scripts/replay.sh replay
         env:
           REPLAY_PUSH: ${{ github.event_name == 'pull_request' && '0' || '1' }}
           APS_BOT_PAT: ${{ secrets.APS_BOT_PAT }}   # (P45) carries pushes that move workflow files
