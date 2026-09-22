@@ -73,6 +73,12 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write   # sync pushes main; replay force-pushes aps/main (CI output by design)
+      workflows: write  # (P45, landing-flow) patch 090's queue is the first to modify
+                        # .github/workflows/** (the two playwright invokers) — the replayed
+                        # aps/main carries those changes, and GitHub refuses a workflow-file
+                        # push from a token without this permission (measured on the first
+                        # post-landing run: "refusing to allow a GitHub App to create or
+                        # update workflow … without `workflows` permission")
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
         with:
