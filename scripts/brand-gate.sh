@@ -451,6 +451,36 @@ row 090 "the PHP-borne English assertions stay English — the zero-PHP rule's l
 row 090 "the harness pulls the fork's image — compose.yaml repointed at ghcr.io/aps-conecta/all-in-one, zero upstream refs" \
   suite_fork_image "$TREE"
 
+# ── slice 23: the drift-equality row (the FRD S11 gate: README/twig string equality) ──────
+
+readme_twig_equal() {  # the fork declaration (main's readme.md) quotes the wizard's shipped
+  # bytes — docs assert what exists. Each pair is QUOTE|TREE-FILE: the string must byte-exist
+  # in the declaration AND in the named file of the replayed tree. A drift on either side —
+  # a 070 regeneration that rewords the wizard, or a hand-edit that rewords the declaration —
+  # reds naming the string. The two ConfigurationManager examples are the 68-list's own
+  # quotes: they assert the stay-English canaries from the README side (the 090 suite row
+  # guards three of them from the suite side; these two are the declaration's documentation
+  # staying true to php/src's bytes).
+  local fail=0 q f
+  while IFS='|' read -r q f; do
+    grep -qF "$q" "$REPO_ROOT/readme.md" \
+      || { echo "  the fork declaration no longer quotes: $q" >&2; fail=1; }
+    grep -qF "$q" "$TREE/$f" \
+      || { echo "  $f does not carry the declared string: $q" >&2; fail=1; }
+  done <<'EOF'
+APS Conecta AIO — Instalador|php/templates/layout.twig
+APS Conecta AIO — Instalador|php/templates/log.twig
+APS Conecta AIO ya está instalado|php/templates/already-installed.twig
+pendiente de empaquetado|php/templates/containers.twig
+Please enter a domain and not an IP-address!|php/src/Data/ConfigurationManager.php
+The entered timezone does not seem to be a valid timezone!|php/src/Data/ConfigurationManager.php
+EOF
+  [ "$fail" -eq 0 ]
+}
+
+row 070 "the fork declaration quotes the wizard's shipped bytes — every declared string byte-exists in the replayed tree and in main's readme (the S11 drift gate: docs assert what exists)" \
+  readme_twig_equal
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1

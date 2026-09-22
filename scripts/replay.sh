@@ -17,7 +17,8 @@
 # The allowlist is exactly the D6 amendment recorded with images.yml: images.yml, replay.yml,
 # .codespellrc (slice 11's forced extension — see allowlisted()'s comment), scripts/,
 # patches/, BUGS.md (BUGS.md is slice 23's deliverable, pre-listed so it never breaks parity
-# when it lands). Prefix entries are safe BECAUSE (a) still catches upstream adding anything
+# when it lands) — and readme.md is the ONE declared modification (slice 23): the fork declaration rides main's landing page under the strip-and-compare exception in cmd_parity — see DECLARED_MOD's comment; the (b) half is untouched, so upstream ever deleting readme.md turns main's copy into a rogue addition a human reconciles.
+# Prefix entries are safe BECAUSE (a) still catches upstream adding anything
 # under them as a missing file.
 #
 # WHY THE QUEUE REPLAYS FROM THE UPSTREAM TIP, NEVER FROM aps/main. aps/main is force-pushed CI
@@ -82,6 +83,16 @@ EOF
 # correct words, so the ignore-list config must exist on main (this allowlist entry) and in
 # the replayed tree (patch 060 carries a byte-identical copy; main's copy must match it —
 # the coverage-rule + codespell-green checks are the operational proof).
+# THE ONE DECLARED MODIFICATION (slice 23): readme.md carries the fork declaration block on
+# main — D2's landing-page surface (the repo a visitor lands on must declare the fork; aps/main
+# is force-pushed CI output and no image ships a readme; the pure-patch vehicle would leave
+# the landing page undeclared). It is the single upstream file main deliberately modifies, and
+# the exception is SCOPED, not blanket: it holds only while main's copy minus the marker-
+# delimited block strips back to byte-identical upstream bytes — enforced in cmd_parity below.
+DECLARED_MOD="readme.md"
+strip_declaration() {  # FILE — the marker-delimited fork declaration, deleted (the parity form)
+  sed '/^<!-- aps-fork-declaration-start -->$/,/^<!-- aps-fork-declaration-end -->$/d' "$@"
+}
 allowlisted() {  # PATH
   case "$1" in
     .github/workflows/images.yml|.github/workflows/replay.yml|.codespellrc|BUGS.md) return 0 ;;
@@ -104,13 +115,24 @@ cmd_parity() {
   # exclude, so parity would go green while an upstream file silently went missing at its
   # path (the slice-7 verifier's find). Rename detection OFF forces the honest D+A pair:
   # the D dies here (the file went missing), the A dies on the allowlist check if rogue.
-  # (a) upstream's files are never modified or missing on main — no excludes at all
+    # (a) upstream's files are never modified or missing on main — ONE scoped exception (slice 23)
   modified="$(git diff --name-only --diff-filter=MD --no-renames "$base" HEAD)"
   if [ -n "$modified" ]; then
-    echo "PARITY: *** FAIL *** — upstream files modified or missing on main:" >&2
-    while IFS= read -r f; do [ -n "$f" ] && printf '  %s\n' "$f" >&2; done <<< "$modified"
-    echo "  every change to mirrored files moves as a numbered patch (the one rule) — move this edit into patches/" >&2
-    exit 1
+    rest="$(grep -vxF "$DECLARED_MOD" <<<"$modified" || true)"
+    if [ -n "$rest" ]; then
+      echo "PARITY: *** FAIL *** — upstream files modified or missing on main:" >&2
+      while IFS= read -r f; do [ -n "$f" ] && printf '  %s\n' "$f" >&2; done <<< "$rest"
+      echo "  every change to mirrored files moves as a numbered patch (the one rule) — move this edit into patches/" >&2
+      exit 1
+    fi
+    # the exception's own proof: main's readme.md minus the declaration block is byte-identical
+    # to upstream's. pipefail makes a missing HEAD file die here; cmp makes a hand-edit below
+    # the block die; a mangled marker pair leaves the block's bytes in and dies the same way.
+    git show "HEAD:$DECLARED_MOD" | strip_declaration /dev/stdin >"$TMPD/readme.stripped" \
+      || die "PARITY: *** FAIL *** — $DECLARED_MOD is missing on main (the declaration's own file)"
+    git show "$base:$DECLARED_MOD" >"$TMPD/readme.upstream"
+    cmp -s "$TMPD/readme.stripped" "$TMPD/readme.upstream" \
+      || die "PARITY: *** FAIL *** — readme.md carries changes beyond the fork declaration block — every other change to mirrored files moves as a numbered patch (the one rule)"
   fi
   # (b) main's additions are fork-infra, nothing else
   added="$(git diff --name-only --diff-filter=A --no-renames "$base" HEAD)"

@@ -1,3 +1,79 @@
+<!-- aps-fork-declaration-start -->
+> [!IMPORTANT]
+> **This is APS Conecta AIO — Instalador, a fork of
+> [Nextcloud All-in-One](https://github.com/nextcloud/all-in-one)** maintained by
+> [APS Conecta](https://github.com/APS-Conecta) for Chilean primary-healthcare clinics
+> (CESFAM and the APS network). It is **not** produced by, affiliated with, sponsored, or
+> endorsed by Nextcloud GmbH. "Nextcloud" and the Nextcloud logo are trademarks of
+> Nextcloud GmbH.
+
+**What this fork changes.** Everything ships as numbered patches under [`patches/`](patches/),
+replayed by CI over the `main` branch — which mirrors upstream byte-for-byte outside the
+fork-infra paths — into `aps/main`, the tree the images are built from:
+
+| Patch | What it does |
+|---|---|
+| 010 | the container images re-pointed at this fork's registry (`ghcr.io/aps-conecta/*`) |
+| 020 | the app store disabled — apps ship baked, never fetched |
+| 030 | the suite's apps and theme baked into the Nextcloud image |
+| 040 | self-update suppressed — the suite updates as one lockstep set |
+| 050 | the Collabora and OnlyOffice cards removed (Euro-Office is the suite's office) |
+| 051 | the deSEC DNS flow removed |
+| 060 | the operator-visible strings translated to Spanish (es-CL, formal usted) |
+| 070 | the wizard re-skinned to the APS Conecta identity |
+| 080 | the three php/src registry references re-pointed at this fork |
+| 090 | the wizard's Playwright suite translated to assert the es-CL bytes |
+
+**No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
+an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates
+verify; the sole PHP-side string changes are patch 080's three registry references.
+
+**What the operator sees.** The wizard presents itself as «APS Conecta AIO — Instalador»;
+an already-installed instance greets with «APS Conecta AIO ya está instalado»; the territorio
+app's card reads «pendiente de empaquetado» until that app ships. These are the shipped bytes
+— the brand gate proves them equal to this declaration on every replay.
+
+**Why some messages remain in English.** The wizard renders 68 operator-visible messages from
+PHP code the fork never touches (the zero-PHP rule). They stay English by scope decision, and
+this is the complete list, by source:
+
+| Source | Count | Where | Examples |
+|---|---|---|---|
+| `php/src/Data/ConfigurationManager.php` | 35 | :599–:1148 | "Please enter a domain and not an IP-address!", "The entered timezone does not seem to be a valid timezone!" |
+| `php/src/Desec/DesecManager.php` | 17 | — | deSEC registration errors (the flow is removed from the UI; the messages are unreachable) |
+| `php/src/Controller/LoginController.php` | 2 | :22, :34 | "The login is blocked since Nextcloud is running.", "The password is incorrect." |
+| `php/src/Controller/DockerController.php` | 3 | :81, :308, :353 | "Container not found.", "Stopping container", "Automatically reloading the page after 10s." |
+| `php/src/Docker/DockerActionManager.php` | 9 | :198–:1205 | the four "Could not …" errors, the two "You probably did not follow the documentation correctly" messages, the streaming lines ("Starting container", "Docker system prune completed.", "Automatically reloading the page after 10s.") |
+| `php/public/index.php` | 2 | :264, :274 | "Not Found", "Method not allowed" |
+
+The translated Playwright suite (`php/tests`, patch 090) keeps English assertions on three of
+these as its own canary that the sweep never bled into PHP.
+
+**Nominative use.** Translated prose keeps the product's own names where the sentence is about
+the software (the wizard's login screen says «frase de contraseña de Nextcloud AIO»), and the
+wizard's documentation links point at Nextcloud's own manuals on purpose — those documents
+describe the software the clinic runs. The image labels are byte-identical upstream,
+deliberately, and both readings are recorded: `org.opencontainers.image.vendor` says
+"Nextcloud" — true and honest nominative use, the software inside the image IS Nextcloud,
+with this declaration carrying the fork's attribution — and `org.opencontainers.image.url`
+points at Nextcloud's own documentation, which is correct for the software but not for this
+suite's install story: the suite's documentation is this repository plus gestion's
+`docs/INSTALLER.md`, never the label's target. This repository is the source of the
+modifications.
+
+**License.** The upstream [LICENSE](LICENSE) (AGPL-3.0) is carried unchanged. The complete
+corresponding source of every suite image is this repository at the matching suite tag: the
+`main` branch's upstream history plus the patch queue is the whole of it.
+
+**Installing.** A clinic installs from the published suite tag, never from this branch — the
+runbook (preflight, the provisionador, backups, the map, updates) lives in
+[`APS-Conecta/gestion`'s `docs/INSTALLER.md`](https://github.com/APS-Conecta/gestion/blob/main/docs/INSTALLER.md),
+and its Spanish walkthrough for clinic IT in
+[`docs/GUIA-CLINICA.md`](https://github.com/APS-Conecta/gestion/blob/main/docs/GUIA-CLINICA.md).
+
+Bugs this fork's own tooling hit are ledgered in [BUGS.md](BUGS.md); upstream's own issues
+belong to [nextcloud/all-in-one](https://github.com/nextcloud/all-in-one/issues).
+<!-- aps-fork-declaration-end -->
 # Nextcloud All-in-One
 
 > [!NOTE]
