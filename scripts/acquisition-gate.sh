@@ -126,6 +126,23 @@ selfupdate_optin() {  # the suite's update channel is opt-in: checkbox defaults 
 row 040 "self-update stays opt-in — the automatic_updates checkbox defaults OFF and the wizard carries zero watchtower POST forms (the nightly chain arms only by deliberate operator choice)" \
   selfupdate_optin
 
+desec_surfaces_gone() {  # zero deSEC refs across wizard templates and public assets (hits print).
+  # PHP stays byte-identical (zero-PHP rule): index.php keeps the /desec route and the twig
+  # context vars, php/src keeps DesecManager — the scan excludes PHP by construction (templates
+  # carry no PHP; the public half is include-scoped to js/css).
+  local hits=0
+  grep -rniHE 'desec' "$TREE/php/templates" && hits=1
+  grep -rniHE --include='*.js' --include='*.css' 'desec' "$TREE/php/public" && hits=1
+  [ "$hits" -eq 0 ]
+}
+
+
+row 051 "the deSEC registration channel is gone from the wizard — zero deSEC refs across templates and public assets (the third-party domain-registration flow removed at the only layer the operator sees)" \
+  desec_surfaces_gone
+
+row 051 "the own-domain flow is intact — the domain form still present (the deletion's positive control)" \
+  grep -q 'id="domain"' "$TREE/php/templates/containers.twig"
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1
