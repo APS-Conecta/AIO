@@ -1,63 +1,331 @@
-# The suite image channel — publishes ghcr.io/aps-conecta/*:<suite tag> as byte-identical
-# copies of the upstream lockstep digests. The suite tag IS the channel — never a raw digest
-# (every sibling resolves %AIO_CHANNEL% from it; one tag, 20 images, zero fork logic).
+# S1 — the lockstep image pipeline. 20 images under ghcr.io/aps-conecta/* per suite tag: 18
+# registry-side retags of upstream (docker buildx imagetools create — seconds, zero runner disk, the
+# multi-arch manifest list carried byte-for-byte) + 2 real builds (aio-nextcloud, the apps+theme
+# bake that patch 030 slots in; all-in-one, the mastercontainer reskin that patch 070 slots in).
 #
-# PHASE-0 SEED (manual dispatch): the v0.2.0 suite tags ride the manual
-# `docker buildx imagetools create` mechanics — identical upstream digest copies, published
-# BEFORE the gestion tag push (the release manifest's --emit resolves them from the registry).
-# The installer program's Phase 6 grows this file: scripts/retag.sh extraction, the
-# tag-completeness matrix as a standing gate, the boot smoke. A published tag's digests never
-# move — the pre-check refuses any re-push, loudly.
+# WHY THE MATRIX GATES THE ANNOUNCE. The wizard resolves every sibling's tag from the mastercontainer's
+# own running image tag (%AIO_CHANNEL% -> the channel = the tag the operator ran,
+# php/src/Docker/DockerActionManager.php BuildImageName). One tag, twenty images: a missing tag is
+# not "one feature down" — the wizard's registry-reachability checks fail the whole start. Existence
+# alone is not enough either: the matrix also proves the 18 retagged images match ONE upstream
+# snapshot (a walk that straddled an upstream release would mix two releases inside one suite tag),
+# and the boot smoke proves the pushed mastercontainer actually PULLS and BOOTS — manifest-inspect
+# never reads a layer byte, so a broken push is invisible to it.
+#
+# THE BUILD-REF SEAM. aps/main is the DEFAULT since the replay chain landed (S4, slice 7): both
+# dispatch and workflow_call default there, so every human dispatch and every caller builds the
+# PATCHED tree — publishing unpatched now takes a deliberate build-ref=main (repair/testing only;
+# the replay chain's hand-off passes aps/main explicitly anyway; with 030 queued that mode
+# builds the UNBAKED upstream nextcloud image — the bake's Dockerfile lines are themselves a
+# patch, so the two trees disagree by construction, and a suite tag is never published from
+# it). Only the two BUILD jobs read build-ref (the Dockerfiles — upstream files, present on
+# every ref; the bake's COPY sources are workflow-materialized, on every ref alike);
+# scripts/retag.sh runs from main's checkout everywhere, so no job depends on the generated
+# branch carrying fork-infra. The two build jobs refuse to mix trees: the manifest job asserts
+# both builds resolved the same commit of build-ref.
+#
+# IMMUTABILITY. A published tag's digests never move (D12: one distribution, one version). The retag
+# job refuses a fully-present set without force, and the builds run needs: retag so the refusal also
+# stops THEM — a rejected re-dispatch moves zero bytes (the builds serialize behind the pre-check's
+# ~2 min of digest reads; that overlap is not worth the immutability rule). --force exists to repair
+# a set that failed verification, or to refresh a throwaway CI tag — never a green, published release.
+#
+# SECRETS. Only the ephemeral GITHUB_TOKEN (org-linked, packages:write where a job pushes). No PAT
+# lives in this repo: the read:packages PAT is the OPERATOR-side install step (R2's decision), never
+# CI's. Per-job permissions are least-privilege: write only in the three jobs that push.
+#
+# ACTIONS ARE SHA-PINNED — upstream's own convention in every workflow it ships, and load-bearing
+# here: the mirror's lint-yaml runs zizmor --min-severity medium over .github/workflows on PRs, and
+# unpinned uses are exactly what it exists to catch. Bump = resolve the new tag's SHA, change the
+# pin, keep the # comment naming the version.
+#
+# FORK-INFRA PLACEMENT (a D6 amendment, ratified with this slice). This file lives on main, which
+# stays a byte-identical upstream mirror for everything upstream ships. Fork-only paths — this
+# workflow, scripts/retag.sh, and (with S4) replay.yml, scripts/{replay,brand-gate,acquisition-
+# gate}.sh, patches/, BUGS.md — are the mirror-parity allowlist: S4's parity assert diffs main
+# against upstream byte-for-byte EXCEPT these paths. It is the only topology under which GitHub can
+# run the fork's own CI at all: dispatch, schedule and reusable workflows must exist on the default
+# branch, and aps/main is force-pushed CI output — unusable as the default. All patch-queue content
+# (changes to files upstream ships) still moves as numbered patches replayed into aps/main, exactly
+# as D6 requires; the allowlist covers only files upstream does not have, so the mirror stays
+# diffable. Upstream's own validators (shellcheck on **.sh, lint-yaml/zizmor, json-validator) run on
+# our files too — green on them is a program requirement.
+#
+# The release ordering this workflow serves: suite tags publish BEFORE the gestion tag push at every
+# release (the gestion release workflow resolves the digests from the registry at tag time); the
+# manifest job's JSON is the publish-time record — same digest format as gestion's
+# release-manifest.sh --emit, so the two can be diffed against each other.
 name: Images
 
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: "The suite tag to publish (D12: it equals the gestion release tag)"
+      suite-tag:
+        description: "The suite tag this lockstep set publishes — the gestion release tag it accompanies (v0.2.0). Channel-valid Docker tag; 'latest*' reserved."
         required: true
+        type: string
+      build-ref:
+        description: "The ref the 2 real builds check out. aps/main = the replayed (patched) tree — the default since S4. main = the byte-identical mirror, unpatched — deliberate repair/testing only (with the bake queued, that means the UNBAKED upstream nextcloud image)."
+        required: false
+        default: aps/main
+        type: string
+      upstream-channel:
+        description: "The upstream channel the 18 registry-side retags copy from (ghcr.io/nextcloud-releases/<image>:<channel>)."
+        required: false
+        default: latest
+        type: string
+      force:
+        description: "Re-publish over a fully-present set — repair a set that failed verification, or refresh a throwaway CI tag. Never a green release tag."
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      suite-tag:
+        required: true
+        type: string
+        description: "See workflow_dispatch."
+      build-ref:
+        required: false
+        default: aps/main
+        type: string
+        description: "See workflow_dispatch."
+      upstream-channel:
+        required: false
+        default: latest
+        type: string
+        description: "See workflow_dispatch."
+      force:
+        required: false
+        default: false
+        type: boolean
+        description: "See workflow_dispatch."
 
 permissions:
-  packages: write
   contents: read
 
 concurrency:
-  group: images-${{ github.event.inputs.release_tag }}
+  group: images-${{ inputs.suite-tag }}
+  cancel-in-progress: false   # a publish walk is never cancelled mid-flight; runs for one tag serialize
 
 jobs:
   retag:
-    name: Publish the suite tags over the current lockstep digest set
+    name: Retag the 18 registry-side images
     runs-on: ubuntu-latest
-    env:
-      TAG: ${{ github.event.inputs.release_tag }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Publish and verify the 20 suite tags
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
+        # main (default): containers.json — the sibling list's source (parsed, never hardcoded)
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Registry-side retag walk
         run: |
-          set -eu
-          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          # The sibling list is read out of php/containers.json — the single source; upstream's
-          # 20th container auto-includes (patch 010's own "keep it generated" rule).
-          names="$(jq -r '."aio_services_v1"[].image' php/containers.json \
-                     | sed 's|^ghcr.io/nextcloud-releases/||' | sort -u)"
-          n="$(printf '%s\n' "$names" | grep -c .)"
-          [ "$n" -eq 19 ] \
-            || { echo "FATAL: $n siblings in containers.json — expected 19 (the list moved; re-measure)"; exit 1; }
-          names="all-in-one $names"   # the mastercontainer + the 19 siblings = 20
-          ok=0
-          for name in $names; do
-            # A published tag's digests never move — suite tags are immutable; refuse any re-push.
-            if docker buildx imagetools inspect "ghcr.io/aps-conecta/$name:$TAG" >/dev/null 2>&1; then
-              echo "FATAL: ghcr.io/aps-conecta/$name:$TAG is already published — suite tags never move"; exit 1
-            fi
-            upstream="$(docker buildx imagetools inspect "ghcr.io/nextcloud-releases/$name:latest" --format '{{.Manifest.Digest}}')"
-            docker buildx imagetools create --tag "ghcr.io/aps-conecta/$name:$TAG" "ghcr.io/nextcloud-releases/$name:latest" >/dev/null
-            published="$(docker buildx imagetools inspect "ghcr.io/aps-conecta/$name:$TAG" --format '{{.Manifest.Digest}}')"
-            [ "$published" = "$upstream" ] \
-              || { echo "FATAL: $name published $published but the upstream lockstep says $upstream"; exit 1; }
-            printf '  %-24s %s\n' "$name" "$published"
-            ok=$((ok + 1))
+          set -euo pipefail
+          args=(--channel "$UPSTREAM_CHANNEL")
+          if [ "$FORCE" = "true" ]; then args+=(--force); fi
+          bash scripts/retag.sh retag "$SUITE_TAG" "${args[@]}"
+        env:
+          SUITE_TAG: ${{ inputs.suite-tag }}
+          UPSTREAM_CHANNEL: ${{ inputs.upstream-channel }}
+          FORCE: ${{ inputs.force }}
+
+  build-aio-nextcloud:
+    name: Build aio-nextcloud (the bake's slot)
+    needs: retag   # the immutability pre-check gates the builds too: a refused re-dispatch moves zero bytes
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
+        with:
+          ref: ${{ inputs.build-ref }}
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .   # the Dockerfile copies from repo root (php/, app/, Containers/, community-containers/, aps-bake/ — the bake's materialized output)
+          file: Containers/nextcloud/Dockerfile
+          push: true
+          tags: ghcr.io/aps-conecta/aio-nextcloud:${{ inputs.suite-tag }}
+          cache-from: type=gha,scope=aio-nextcloud
+          cache-to: type=gha,mode=max,scope=aio-nextcloud
+
+  build-all-in-one:
+    name: Build all-in-one (the mastercontainer reskin's slot)
+    needs: retag   # same gate as the other build: the pre-check refusal stops the push, not just the retags
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
+        with:
+          ref: ${{ inputs.build-ref }}
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Containers/mastercontainer/Dockerfile
+          push: true
+          tags: ghcr.io/aps-conecta/all-in-one:${{ inputs.suite-tag }}
+          cache-from: type=gha,scope=all-in-one
+          cache-to: type=gha,mode=max,scope=all-in-one
+
+  matrix:
+    name: Tag-completeness matrix (the gate)
+    needs: [retag, build-aio-nextcloud, build-all-in-one]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
+        # main (default), NOT build-ref: the sibling NAMES are identical on every ref — 010's
+        # generated sed swaps the org prefix and never the names (the auto-include property), and
+        # retag.sh parses the basename, so the mirror's containers.json is the one list wherever
+        # the tree is patched or not. A fork-side rename of an image is out of the patch queue's
+        # surface (010 is prefix-only by locked design); an upstream rename/addition flows through
+        # the mirror sync into this same file.
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3   # freshly-pushed packages are private until the org flips them public
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Matrix — all images present + the retagged match one snapshot
+        run: bash scripts/retag.sh matrix "$SUITE_TAG" --channel "$UPSTREAM_CHANNEL"
+        env:
+          SUITE_TAG: ${{ inputs.suite-tag }}
+          UPSTREAM_CHANNEL: ${{ inputs.upstream-channel }}
+
+  boot-smoke:
+    name: Wizard-boot smoke (interim)
+    needs: matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3   # the pull below is the proof manifest-inspect cannot give
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Boot the published mastercontainer and wait for the wizard (bounded)
+        run: |
+          set -euo pipefail
+          # The slice-1 test-bed's verified minimal bring-up shape, verbatim: only :8080 published,
+          # apache loopback-only on a high port, SKIP_DOMAIN_VALIDATION with no domain set — a
+          # CI-only posture that is never suggested to an operator (D10). The runner is ephemeral,
+          # so the docker.sock read-only mount has nothing to harm.
+          docker run -d --init --sig-proxy=false --name nextcloud-aio-mastercontainer \
+            --restart always \
+            --publish 8080:8080 \
+            --env SKIP_DOMAIN_VALIDATION=true \
+            --env APACHE_PORT=11000 \
+            --env APACHE_IP_BINDING=127.0.0.1 \
+            --volume nextcloud_aio_mastercontainer_smoke:/mnt/docker-aio-config \
+            --volume /var/run/docker.sock:/var/run/docker.sock:ro \
+            "ghcr.io/aps-conecta/all-in-one:${SUITE_TAG}"
+          cleanup() {
+            docker rm -f nextcloud-aio-mastercontainer >/dev/null 2>&1 || true
+            docker volume rm nextcloud_aio_mastercontainer_smoke >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          # The wizard serves the one-time initial password on the first GET /setup (slice 1's own
+          # verified capture point). Bounded: 2 minutes, no unbounded hang anywhere (B-015).
+          for _ in $(seq 60); do
+            html="$(curl -sk --max-time 5 https://127.0.0.1:8080/setup || true)"
+            case "$html" in
+              *'id="initial-password"'*)
+                echo "wizard served the initial password within the bound — the published mastercontainer pulls and boots"
+                exit 0 ;;
+            esac
+            sleep 2
           done
-          echo "suite tags published and verified: $ok/20 under ghcr.io/aps-conecta/*:$TAG"
-          echo "(org chore: the 20 packages land PRIVATE on first push — the flip to public"
-          echo " precedes any real release tag; record it in FINDINGS.md)"
+          echo "=== the wizard never answered; last mastercontainer logs ===" >&2
+          docker logs --tail=50 nextcloud-aio-mastercontainer >&2 || true
+          echo "FAIL: ghcr.io/aps-conecta/all-in-one:${SUITE_TAG} never served the wizard on :8080 within 2 min" >&2
+          exit 1
+        env:
+          SUITE_TAG: ${{ inputs.suite-tag }}
+
+  manifest:
+    name: Digest manifest (the announce)
+    # The builds are listed DIRECTLY, not left to transitivity: the needs context only exposes
+    # outputs of direct dependencies, so without these two entries SHA_A/SHA_B/RETAG_BUILT_SHA
+    # below would resolve empty — the built-pair lockstep assert would compare '' to '' and stay
+    # green for the wrong reason (B-014). No ordering change: the builds are already ancestors
+    # via matrix.
+    needs: [matrix, boot-smoke, build-aio-nextcloud, build-all-in-one]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)   # scripts/retag.sh
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: The two builds must come from one tree (lockstep for the built pair)
+        run: |
+          set -euo pipefail
+          if [ "$SHA_A" != "$SHA_B" ]; then
+            echo "FAIL: the two builds checked out different commits of '$BUILD_REF' — the ref moved mid-run; re-run the pipeline" >&2
+            exit 1
+          fi
+        env:
+          SHA_A: ${{ needs.build-aio-nextcloud.outputs.sha }}
+          SHA_B: ${{ needs.build-all-in-one.outputs.sha }}
+          BUILD_REF: ${{ inputs.build-ref }}
+      - name: Emit the publish record
+        run: |
+          set -euo pipefail
+          bash scripts/retag.sh manifest "$SUITE_TAG" > "suite-${SUITE_TAG}-manifest.json"
+          cat "suite-${SUITE_TAG}-manifest.json"
+          {
+            echo "### Suite tag \`${SUITE_TAG}\` — publish record"
+            echo '```json'
+            cat "suite-${SUITE_TAG}-manifest.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SUITE_TAG: ${{ inputs.suite-tag }}
+          RETAG_CHANNEL: ${{ inputs.upstream-channel }}
+          RETAG_BUILT_REF: ${{ inputs.build-ref }}
+          RETAG_BUILT_SHA: ${{ needs.build-aio-nextcloud.outputs.sha }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: suite-manifest-${{ inputs.suite-tag }}
+          path: suite-${{ inputs.suite-tag }}-manifest.json
+          if-no-files-found: error
