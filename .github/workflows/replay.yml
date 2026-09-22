@@ -1,0 +1,130 @@
+# S4 — the replay chain: main mirrors upstream; the queue turns it into aps/main; the gates
+# prove what ships; the Images pipeline publishes. Four triggers:
+#
+#   schedule (daily)  the drift discipline: sync the mirror if upstream moved, replay, gate.
+#                     Upstream releases ~every 8 days median; a daily check keeps the queue
+#                     honest with enormous margin on the ≤6-weeks bar. A red run here IS the
+#                     signal — never a reason to force anything. (Forks disable schedules by
+#                     default: enable this workflow's schedule once in the Actions tab — the
+#                     one-time org chore, recorded with slice 7's order-state.)
+#   push (main)       fork-infra landed (a patch, a gate row, a workflow edit): regenerate
+#                     aps/main and re-prove the gates. CI's own sync pushes never re-trigger
+#                     (GITHUB_TOKEN pushes fire no workflows) — only human pushes do.
+#   pull_request      the pre-merge arm: parity + coverage + three-outcome + validators +
+#                     gates against the merge commit, with aps/main untouched (REPLAY_PUSH=0)
+#                     — a broken patch reds the PR, not main. A PR that edits a mirrored file
+#                     instead of adding a patch parity-reds here too (the teaching moment).
+#   workflow_dispatch  the publish ritual: suite-tag set = replay + gates, then hand off to
+#                     the Images pipeline with build-ref aps/main. Suite tags publish BEFORE
+#                     the gestion tag push at every release (the locked ordering). An empty
+#                     suite-tag = a plain replay run (look, don't publish).
+#
+# THE JOB'S STEP ORDER IS THE GATE STACK: sync → parity → replay → validators → gates →
+# (publish). The publish job needs this job green — a red replay or a red gate can never move
+# images. The validators are upstream's own four, replicated verbatim against the REPLAYED
+# tree: aps/main is force-pushed CI output, so upstream's workflows never fire on it — this is
+# where their contract is upheld on the tree we actually ship. codespell, docker-lint and
+# json-validator ride scripts/replay.sh validate; twig-lint is its own step (it needs PHP 8.5 +
+# apcu, upstream's own setup).
+#
+# FORK-INFRA (the D6 allowlist; parity asserts everything else stays byte-identical): this
+# workflow, images.yml, scripts/, patches/, BUGS.md.
+#
+# SECRETS: only the ephemeral GITHUB_TOKEN. The replay job needs contents: write (it syncs
+# main and force-pushes aps/main — main itself is merge-only by construction: sync uses git
+# merge and dies on conflict, and the workflow never passes --force to a main push). The
+# publish job carries packages: write as headroom for the Images pipeline's pushing jobs.
+# No PAT lives in this repo (R2's read:packages PAT is the operator's install-time step,
+# never CI's). No input reaches any run: text — suite-tag flows through with:/env only.
+#
+# ACTIONS SHA-PINNED — upstream's own convention (and the mirror's lint-yaml runs
+# zizmor --min-severity medium over .github/workflows on PRs; unpinned uses are its catch).
+name: Replay
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      suite-tag:
+        description: "Publish path: the suite tag the Images pipeline publishes (the gestion release tag it accompanies). Empty = replay + gates only."
+        required: false
+        type: string
+      force:
+        description: "Images passthrough: re-publish over a fully-present set (throwaway ci-* tags, repairs). Never a green release tag."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: replay
+  cancel-in-progress: false   # a replay walk is never cancelled mid-flight; runs serialize
+
+jobs:
+  replay:
+    name: Sync, replay, validate, gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write   # sync pushes main; replay force-pushes aps/main (CI output by design)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
+        with:
+          fetch-depth: 0   # sync merges and parity diffs need the full history
+      - name: Sync the mirror (merge upstream into main; no-op when current)
+        if: github.event_name != 'pull_request'
+        run: |
+          git checkout main   # checkout leaves HEAD detached at the event sha; mirror work happens on the branch
+          bash scripts/replay.sh sync
+      - name: Publish the sync (no-op when upstream has not moved)
+        if: github.event_name != 'pull_request'
+        run: |
+          if ! git push origin main; then
+            echo "main moved mid-run (a fork-infra PR merged) — re-run this workflow; nothing was lost" >&2
+            exit 1
+          fi
+      - name: Mirror parity (the D6 fence — PR runs prove the merge commit is parity-clean)
+        run: bash scripts/replay.sh parity
+      - name: Replay the queue (PR runs prove without publishing)
+        run: bash scripts/replay.sh replay
+        env:
+          REPLAY_PUSH: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+      - name: Upstream validators I — codespell, docker-lint, json-validator
+        run: bash scripts/replay.sh validate .aps-replay-tree
+      - name: Upstream validator II — twig-lint (needs PHP; upstream's own setup)
+        uses: shivammathur/setup-php@7bf05c6b704e0b9bfee22300130a31b5ea68d593 # v2 (upstream's own pin)
+        with:
+          php-version: 8.5
+          extensions: apcu
+          coverage: none
+      - name: twig lint (upstream's own command, against the replayed tree)
+        run: |
+          cd .aps-replay-tree/php
+          composer install
+          composer run lint:twig
+      - name: Brand gate
+        run: bash scripts/brand-gate.sh .aps-replay-tree
+      - name: Acquisition gate
+        run: bash scripts/acquisition-gate.sh .aps-replay-tree
+
+  publish:
+    name: Hand off to the Images pipeline
+    needs: replay   # a red replay or a red gate can never move images
+    # event_name first, on purpose: `inputs.*` resolves null outside workflow_dispatch, and
+    # null-vs-'' comparisons lean on GitHub's coercion rules — the explicit guard reads
+    # unambiguous and can never publish from a push, a schedule, or a PR.
+    if: github.event_name == 'workflow_dispatch' && inputs.suite-tag != ''
+    uses: ./.github/workflows/images.yml
+    with:
+      suite-tag: ${{ inputs.suite-tag }}
+      build-ref: aps/main   # the replayed tree — the point of the whole chain
+      force: ${{ inputs.force }}
+    permissions:
+      contents: read
+      packages: write   # headroom for the Images pipeline's three pushing jobs
