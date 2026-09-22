@@ -78,6 +78,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
         with:
           fetch-depth: 0   # sync merges and parity diffs need the full history
+          persist-credentials: false   # (P45) checkout's extraheader makes EVERY push authenticate as the GitHub App and overrides URL-embedded tokens — measured; the PAT carries all writes, reads are public
       - name: Sync the mirror (merge upstream into main; no-op when current)
         if: github.event_name != 'pull_request'
         run: |
