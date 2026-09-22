@@ -101,6 +101,31 @@ row 020 "the app store is baked off — NC_appstoreenabled=\"0\" ENV in Containe
 row 015 "the eurooffice documentserver base pins the suite's certified pairing (DS 9.3.4 ↔ connector 11.0.5 — R3's set-certified pin; re-cut from the v0.2.0 choreography's main commit so main stays the byte-identical mirror)" \
   grep -q 'documentserver:v9.3.4' "$TREE/Containers/eurooffice/Dockerfile"
 
+selfupdate_optin() {  # the suite's update channel is opt-in: checkbox defaults off, no watchtower POST remains
+  local f="$TREE/php/templates/containers.twig"
+  # both halves (test.sh:217-263 discipline): the unchecked shape PRESENT, the checked shape ABSENT
+  if ! grep -q 'id="automatic_updates" name="automatic_updates">' "$f"; then
+    echo "  the automatic_updates checkbox is missing or attribute-shaped differently — patch 040's default-off flip is not in the tree" >&2
+    return 1
+  fi
+  if grep -q 'id="automatic_updates" name="automatic_updates" checked' "$f"; then
+    echo "  the automatic_updates checkbox still defaults ON — the nightly chain would arm itself on first save" >&2
+    return 1
+  fi
+  if grep -q 'api/docker/watchtower' "$f"; then
+    echo "  a watchtower POST form survived — the manual mastercontainer-update trigger is still reachable from the wizard" >&2
+    return 1
+  fi
+  if ! grep -q 'api/docker/start' "$f"; then
+    echo "  the container-start forms vanished — patch 040 ate more than the watchtower arms" >&2
+    return 1
+  fi
+}
+
+
+row 040 "self-update stays opt-in — the automatic_updates checkbox defaults OFF and the wizard carries zero watchtower POST forms (the nightly chain arms only by deliberate operator choice)" \
+  selfupdate_optin
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1

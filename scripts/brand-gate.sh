@@ -102,6 +102,50 @@ row 010 "containers.json carries at least 19 aps-conecta image refs (the floor �
 row 080 "php/src carries zero upstream registry refs (the 3 string refs swapped: DockerActionManager.php:788, 789, 1111)" \
   upstream_refs "$TREE/php/src"
 
+office_ids_absent() {  # PATH... — zero office-collabora/office-onlyoffice ids (hits print)
+  local f hits=0
+  for f in "$@"; do
+    [ -e "$f" ] || { echo "office_ids_absent: no such path: $f" >&2; return 1; }
+    grep -rnHE 'office-collabora|office-onlyoffice' "$f" && hits=$((hits+1))
+  done
+  [ "$hits" -eq 0 ]
+}
+
+collabora_forms_gone() {  # the dictionaries/additional-options forms are gone from the TEMPLATES (hits print).
+  # Templates-scoped on purpose: index.php:135-136 passes collabora_dictionaries/collabora_additional_options
+  # into the twig context and STAYS byte-identical (zero-PHP rule) — the deleted section was their only consumer.
+  local hits=0
+  grep -rnHE 'collabora_dictionaries|collabora_additional_options' "$TREE/php/templates" && hits=1
+  [ "$hits" -eq 0 ]
+}
+
+office_floor() {  # FILE... — the eurooffice surface present in each (patch 050's positive control)
+  local f
+  for f in "$@"; do
+    grep -q 'office-eurooffice' "$f" || { echo "  no eurooffice ref in $f — patch 050 ate the suite's own card" >&2; return 1; }
+  done
+}
+
+files_absent() {  # PATH... — none may exist (a deletion post-state; survivors print)
+  local f
+  for f in "$@"; do
+    if [ -e "$f" ]; then echo "  still present: $f" >&2; return 1; fi
+  done
+}
+
+
+row 050 "the wizard carries zero Collabora/OnlyOffice vendor ids — cards, JS refs, CSS selectors gone from templates and public assets" \
+  office_ids_absent "$TREE/php/templates" "$TREE/php/public"
+
+row 050 "the Collabora dictionaries/additional-options forms are gone from the templates (the PHP context pass-through at index.php:135-136 stays, zero-PHP rule)" \
+  collabora_forms_gone
+
+row 050 "the eurooffice card is intact — radio id, CSS selector, JS guard all present (the deletion's positive control)" \
+  office_floor "$TREE/php/templates/includes/optional-containers.twig" "$TREE/php/public/style.css" "$TREE/php/public/disable-containers.js"
+
+row 050 "the vendor logo assets are gone — img/collabora.svg, img/onlyoffice.svg (dead bytes post-deletion)" \
+  files_absent "$TREE/php/public/img/collabora.svg" "$TREE/php/public/img/onlyoffice.svg"
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
