@@ -73,6 +73,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write   # sync pushes main; replay force-pushes aps/main (CI output by design)
+    env:
+      APS_BOT_PAT: ${{ secrets.APS_BOT_PAT }}   # (P45) job-wide: checkout persists no credential, the PAT carries every publish push
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
@@ -106,7 +108,6 @@ jobs:
           bash scripts/replay.sh replay
         env:
           REPLAY_PUSH: ${{ github.event_name == 'pull_request' && '0' || '1' }}
-          APS_BOT_PAT: ${{ secrets.APS_BOT_PAT }}   # (P45) carries pushes that move workflow files
       - name: Upstream validators I — codespell, docker-lint, json-validator
         run: bash scripts/replay.sh validate .aps-replay-tree
       - name: Upstream validator II — twig-lint (needs PHP; upstream's own setup)
