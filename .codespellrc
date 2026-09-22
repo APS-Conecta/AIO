@@ -1,0 +1,8 @@
+[codespell]
+# The wizard's operator language is es-CL (patch 060) — these are correct Spanish words that
+# codespell's English typo dictionary flags (momento→memento, comando→commando, ...). Listed
+# here so the codespell validator stays green over the translated tree AND over patches/
+# on the fork's main (where the patch bytes carry the same words). Skip this file itself:
+# it necessarily contains the flagged words as list entries.
+skip = .codespellrc
+ignore-words-list = accesible,caracteres,comando,comandos,componentes,doble,funcional,hace,inicial,momento,oficial,posible,requiere,ser,termine,utiliza

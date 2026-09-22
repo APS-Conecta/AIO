@@ -146,6 +146,89 @@ row 050 "the eurooffice card is intact — radio id, CSS selector, JS guard all 
 row 050 "the vendor logo assets are gone — img/collabora.svg, img/onlyoffice.svg (dead bytes post-deletion)" \
   files_absent "$TREE/php/public/img/collabora.svg" "$TREE/php/public/img/onlyoffice.svg"
 
+upstream_changelog_urls_absent() {  # zero upstream changelog/releases URLs in the templates
+  # (hits print). 060 repoints the operator-visible "changelog" arms at the fork's own releases
+  # — an operator asking "what changed?" must never be sent to upstream's release story.
+  local f hits=0
+  for f in "$TREE/php/templates"/*.twig "$TREE/php/templates"/includes/*.twig; do
+    [ -e "$f" ] || continue
+    grep -nHE 'github.com/nextcloud/all-in-one/releases|github.com/nextcloud-releases' "$f" && hits=$((hits+1))
+  done
+  [ "$hits" -eq 0 ]
+}
+
+fork_changelog_present() {  # the positive control: the changelog arms point at the fork's releases
+  grep -q 'https://github.com/APS-Conecta/AIO/releases' "$TREE/php/templates/containers.twig"     || { echo "  no APS-Conecta/AIO releases URL in containers.twig — the changelog arms point nowhere" >&2; return 1; }
+}
+
+escl_sweep() {  # MODE — walk 060's per-file sentinel table. absent = the English sentinel must be
+  # gone (an unreplayed 060 leaves upstream English in place and reds loudly); present = the
+  # es-CL sentinel must be there (a half-applied or mis-regenerated sweep loses a whole FILE —
+  # exactly what this canary exists to catch, the 050 ids/floor precedent at row granularity).
+  # One sentinel pair per swept file; the sweep's full proof is the patch's own edit points.
+  # AMENDED WITH SLICE 12 (070's forced extension): the setup and login present-arms pointed at
+  # the h1 lines the reskin renames ("Configuración de All-in-One", "Inicio de sesión de
+  # Nextcloud AIO") — a sentinel that dies under a later queued patch is a row that reds
+  # forever. Both arms now point at BODY strings 060 wrote that 070 never touches, so the
+  # table passes with 070 queued and without it; the absent-arms (upstream English) are
+  # unaffected by the rename.
+  local mode="$1" f en es fail=0
+  while IFS='|' read -r f en es; do
+    [ -f "$TREE/$f" ] || { echo "escl_sweep: no such file: $f" >&2; return 1; }
+    if [ "$mode" = absent ]; then
+      if grep -nF "$en" "$TREE/$f" >/dev/null; then
+        grep -nF "$en" "$TREE/$f" | head -3 | sed 's/^/  /' >&2
+        echo "  English residue in $f — the sweep did not land there" >&2; fail=1
+      fi
+    else
+      grep -qF "$es" "$TREE/$f" || { echo "  no es-CL sentinel in $f — the translation is missing" >&2; fail=1; }
+    fi
+  done <<'EOF'
+php/templates/containers.twig|value="Log out"|value="Cerrar sesión"
+php/templates/includes/optional-containers.twig|value="Save changes"|value="Guardar cambios"
+php/templates/includes/community-containers.twig|Community Containers|Contenedores comunitarios
+php/templates/includes/aio-config.twig|Click here to view the current AIO config|Haga clic aquí para ver la configuración actual
+php/templates/includes/backup-dirs.twig|An example for Linux is|Un ejemplo para Linux es
+php/templates/components/container-state.twig|>Stopped</a>|>Detenido</a>
+php/templates/setup.twig|All-in-One setup|Anote la frase de contraseña
+php/templates/login.twig|Nextcloud AIO Login|Inicie sesión con su frase de contraseña de Nextcloud AIO
+php/templates/already-installed.twig|is already installed|ya está instalado
+php/templates/log.twig|>Disable</button>|>Desactivar</button>
+php/templates/layout.twig|<html lang="en">|<html lang="es">
+php/public/forms.js|Server error. Please check|Error del servidor.
+php/public/second-tab-warning.js|Cannot open multiple instances|No se pueden abrir múltiples instancias
+php/public/containers-form-submit.js|The docker socket proxy container is deprecated|El contenedor docker socket proxy está obsoleto
+php/public/log-load.js|statusElem.textContent = 'enabled';|statusElem.textContent = 'activada';
+EOF
+  [ "$fail" -eq 0 ]
+}
+
+log_toggle_consistent() {  # the engine's own constraint: log.twig's static toggle labels equal
+  # log-load.js's swap labels — a regeneration that rewords one side breaks the log page's
+  # enabled/disabled display mid-session (R5's consistency note, made mechanical).
+  local t="$TREE/php/templates/log.twig" j="$TREE/php/public/log-load.js"
+  grep -q '<span id="autoloading-status">activada</span>' "$t" || { echo "  log.twig's status word drifted" >&2; return 1; }
+  grep -q "statusElem.textContent = 'activada';" "$j" || { echo "  log-load.js's enabled word drifted from log.twig's" >&2; return 1; }
+  grep -q '<button id="autoloading-control">Desactivar</button>' "$t" || { echo "  log.twig's button label drifted" >&2; return 1; }
+  grep -q "button.textContent = 'Desactivar';" "$j" || { echo "  log-load.js's Disable word drifted from log.twig's" >&2; return 1; }
+}
+
+
+row 060 "the operator-visible changelog links point at the fork's releases — zero upstream github.com/nextcloud* changelog URLs in the templates" \
+  upstream_changelog_urls_absent
+
+row 060 "the changelog arms land on APS-Conecta/AIO's releases page (the repoint's positive control)" \
+  fork_changelog_present
+
+row 060 "the es-CL sweep left no English on any wizard surface — per-file sentinels gone (15 files: containers, includes, components, small views, public JS)" \
+  escl_sweep absent
+
+row 060 "the es-CL sweep landed on every wizard surface — per-file es-CL sentinels present (the sweep's positive control)" \
+  escl_sweep present
+
+row 060 "the log page's toggle words agree between twig and JS — log.twig's static labels equal log-load.js's swap labels" \
+  log_toggle_consistent
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
