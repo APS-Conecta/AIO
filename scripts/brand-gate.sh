@@ -381,6 +381,76 @@ whitelabel_buildtime() {  # bake.sh carries BOTH served-file asserts the office 
 row 030 "the white-label rename is enforced at build time — scripts/bake.sh asserts the served-file strings the office smoke used to own (FRD S3: the greps moved to the bake; the renamed bytes ship inside the image, so this row pins the mechanism to the fork's own script)" \
   whitelabel_buildtime
 
+suite_escl_present() {  # TREE — the translated suite's positive control: one es-CL sentinel per
+  # spec file + helpers (an unreplayed 090 leaves the upstream English assertions in place and
+  # reds loudly). The sentinels are measured bytes from the post-060 templates, never typed.
+  local t="$1" f s fail=0
+  while IFS='|' read -r f s; do
+    [ -f "$t/$f" ] || { echo "suite_escl_present: no such file: $f" >&2; return 1; }
+    grep -qF "$s" "$t/$f" || { echo "  no es-CL sentinel in $f: $s" >&2; fail=1; }
+  done <<'EOF'
+php/tests/tests/helpers.js|Abrir el inicio de sesión de Nextcloud AIO ↗
+php/tests/tests/initial-setup.spec.js|Enviar dominio
+php/tests/tests/initial-setup.spec.js|Contraseña inicial de Nextcloud:
+php/tests/tests/restore-instance.spec.js|¡El último restore fue exitoso!
+php/tests/tests/restore-instance.spec.js|Enviar ubicación y contraseña de cifrado
+EOF
+  return $fail
+}
+
+suite_desec_absent() {  # TREE — 051's consequence, routed to 090: the deSEC flow is gone from the
+  # test harness — the 3 dead specs, the mock, and every desec reference in php/tests/.
+  local t="$1" f
+  for f in php/tests/tests/desec-register.spec.js php/tests/tests/desec-existing.spec.js \
+           php/tests/tests/desec-existing-slug.spec.js php/tests/desec-mock.mjs; do
+    [ -e "$t/$f" ] && { echo "  dead deSEC file survived: $f" >&2; return 1; }
+  done
+  if grep -rni "desec" "$t/php/tests/" --include="*" 2>/dev/null | grep -qv "^$t/php/tests/package-lock.json"; then
+    grep -rni "desec" "$t/php/tests/" 2>/dev/null | head -3 | sed 's/^/  /' >&2
+    echo "  deSEC residue in the test harness" >&2; return 1
+  fi
+  # the workflow invokers too — run.sh would exit 1 on every dead-spec step (the R1 half-state
+  # find: slice 10's referencer list omitted them; this row now owns "every reference" for real)
+  if grep -rni "desec\|AIO_TEST_PASSWORD" "$t/.github/workflows/" 2>/dev/null; then
+    grep -rni "desec\|AIO_TEST_PASSWORD" "$t/.github/workflows/" | head -3 | sed 's/^/  /' >&2
+    echo "  deSEC residue in the workflow invokers" >&2; return 1
+  fi
+  return 0
+}
+
+suite_phpborne_english() {  # TREE — the don't-translate control: the 3 PHP-borne English
+  # assertions STAY English (ConfigurationManager.php:619/:689/:1037 — the zero-PHP rule).
+  # If a future sweep bleeds into php/src, these specs fail at run time AND this row reds
+  # the moment the assertion bytes are "helpfully" translated — the canary for rule drift.
+  local t="$1" s fail=0
+  for s in "Please enter a domain and not an IP-address!" \
+           "The entered timezone does not seem to be a valid timezone!" \
+           "Domain does not point to this server or the reverse proxy is not configured correctly."; do
+    grep -qF "$s" "$t/php/tests/tests/initial-setup.spec.js" "$t/php/tests/tests/restore-instance.spec.js" \
+      || { echo "  PHP-borne English assertion lost: $s" >&2; fail=1; }
+  done
+  return $fail
+}
+
+suite_fork_image() {  # TREE — the dispatch profile pulls the fork's published es-CL image:
+  # compose.yaml's app-base repointed at ghcr.io/aps-conecta/all-in-one (research D15: leaving
+  # the upstream ref makes code-from-image test upstream English — a silently wrong suite).
+  local t="$1"
+  grep -q "image: ghcr.io/aps-conecta/all-in-one:develop" "$t/php/tests/compose.yaml" \
+    || { echo "  compose.yaml does not pull the fork image" >&2; return 1; }
+  upstream_refs "$t/php/tests" && return 0
+  return 1
+}
+
+row 090 "the translated suite asserts the wizard's es-CL bytes — sentinels per spec + helpers (the 060 sweep's positive control inside the suite)" \
+  suite_escl_present "$TREE"
+row 090 "the deSEC flow is gone from the test harness — 3 dead specs + the mock + every reference (051's routed consequence)" \
+  suite_desec_absent "$TREE"
+row 090 "the PHP-borne English assertions stay English — the zero-PHP rule's living proof inside the suite (:619/:689/:1037)" \
+  suite_phpborne_english "$TREE"
+row 090 "the harness pulls the fork's image — compose.yaml repointed at ghcr.io/aps-conecta/all-in-one, zero upstream refs" \
+  suite_fork_image "$TREE"
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
