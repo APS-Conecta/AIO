@@ -3,14 +3,14 @@
 {% block body %}
     <div class="login">
         <svg class="nextcloud-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 142 100" width="142" height="100">
-            <use href="img/nextcloud-logo.svg#logo"></use>
-            <use href="img/nextcloud-logo.svg#Nextcloud"></use>
-            <text x="10" y="50" fill="var(--color-nextcloud-logo)" class="fallback-text">Nextcloud Logo</text>
+            <use href="img/logo.svg#logo"></use>
+            <use href="img/logo.svg#wordmark"></use>
+            <text x="10" y="50" fill="var(--color-nextcloud-logo)" class="fallback-text">Logotipo de APS Conecta</text>
         </svg>
-        <h1>All-in-One setup</h1>
-        <p>The official Nextcloud installation method. Nextcloud All-in-One provides easy deployment and maintenance with most features included in this one Nextcloud instance.</p>
-        <p>⚠️ <strong>Please note down the passphrase to access the AIO interface and don't lose it!</strong></p>
-        <strong>Passphrase</strong><br/><span id="initial-password" class="monospace">{{ password }}</span><br>
-        <a href="." class="button" target="_blank">Open Nextcloud AIO login ↗</a>
+        <h1>Configuración de APS Conecta AIO</h1>
+        <p>El método oficial de instalación de Nextcloud. Nextcloud All-in-One ofrece un despliegue y un mantenimiento sencillos, con la mayoría de las funciones incluidas en esta única instancia de Nextcloud.</p>
+        <p>⚠️ <strong>Anote la frase de contraseña para acceder a la interfaz de AIO y no la pierda.</strong></p>
+        <strong>Frase de contraseña</strong><br/><span id="initial-password" class="monospace">{{ password }}</span><br>
+        <a href="." class="button" target="_blank">Abrir el inicio de sesión de Nextcloud AIO ↗</a>
     </div>
 {% endblock %}

@@ -3,22 +3,22 @@
 {% block body %}
     <div class="login">
         <svg class="nextcloud-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 142 100" width="142" height="100">
-            <use href="img/nextcloud-logo.svg#logo"></use>
-            <use href="img/nextcloud-logo.svg#Nextcloud"></use>
-            <text x="10" y="50" fill="var(--color-nextcloud-logo)" class="fallback-text">Nextcloud Logo</text>
+            <use href="img/logo.svg#logo"></use>
+            <use href="img/logo.svg#wordmark"></use>
+            <text x="10" y="50" fill="var(--color-nextcloud-logo)" class="fallback-text">Logotipo de APS Conecta</text>
         </svg>
-        <h1>Nextcloud AIO Login</h1>
+        <h1>Inicio de sesión de APS Conecta AIO</h1>
         {% if is_login_allowed == true %}
-            <p>Log in using your Nextcloud AIO passphrase:</p>
+            <p>Inicie sesión con su frase de contraseña de Nextcloud AIO:</p>
             <form method="POST" action="api/auth/login" class="xhr">
-                <input type="password" autocomplete="current-password" name="password" placeholder="Password" id="master-password" data-input-show-password>
+                <input type="password" autocomplete="current-password" name="password" placeholder="Contraseña" id="master-password" data-input-show-password>
                 <input type="hidden" name="{{csrf.keys.name}}" value="{{csrf.name}}">
                 <input type="hidden" name="{{csrf.keys.value}}" value="{{csrf.value}}">
-                <input type="submit" class="button" value="Log in" />
+                <input type="submit" class="button" value="Iniciar sesión" />
             </form>
         {% else %}
-            <p>The login is blocked since Nextcloud is running.<br>Please use the <a target="_blank" href="https://github.com/nextcloud/all-in-one#how-to-easily-log-in-to-the-aio-interface"><strong>automatic login</strong></a> from your Nextcloud.<br><br>
-            If that is not possible, you can unblock the login by running<br><strong>sudo docker stop nextcloud-aio-apache</strong></p>
+            <p>El inicio de sesión está bloqueado porque Nextcloud está en ejecución.<br>Utilice el <a target="_blank" href="https://github.com/nextcloud/all-in-one#how-to-easily-log-in-to-the-aio-interface"><strong>inicio de sesión automático</strong></a> desde su Nextcloud.<br><br>
+            Si eso no es posible, puede desbloquear el inicio de sesión ejecutando<br><strong>sudo docker stop nextcloud-aio-apache</strong></p>
         {% endif %}
     </div>
     <script type="text/javascript" src="before-unload.js"></script>
