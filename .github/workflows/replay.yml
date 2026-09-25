@@ -6,7 +6,9 @@
 #                     honest with enormous margin on the ≤6-weeks bar. A red run here IS the
 #                     signal — never a reason to force anything. (Forks disable schedules by
 #                     default: enable this workflow's schedule once in the Actions tab — the
-#                     one-time org chore, recorded with slice 7's order-state.)
+#                     one-time org chore, recorded with slice 7's order-state. The liveness
+#                     job below (org L7-5) reds on the next push/PR if that chore is missed —
+#                     the canary's own enablement is no longer unverifiable org state.)
 #   push (main)       fork-infra landed (a patch, a gate row, a workflow edit): regenerate
 #                     aps/main and re-prove the gates. CI's own sync pushes never re-trigger
 #                     (GITHUB_TOKEN pushes fire no workflows) — only human pushes do.
@@ -20,12 +22,16 @@
 #                     suite-tag = a plain replay run (look, don't publish).
 #
 # THE JOB'S STEP ORDER IS THE GATE STACK: sync → parity → replay → validators → gates →
-# (publish). The publish job needs this job green — a red replay or a red gate can never move
-# images. The validators are upstream's own four, replicated verbatim against the REPLAYED
-# tree: aps/main is force-pushed CI output, so upstream's workflows never fire on it — this is
-# where their contract is upheld on the tree we actually ship. codespell, docker-lint and
-# json-validator ride scripts/replay.sh validate; twig-lint is its own step (it needs PHP 8.5 +
-# apcu, upstream's own setup).
+# drift report → (publish). The publish job needs this job green — a red replay or a red gate
+# can never move images. The validators are upstream's own four, replicated verbatim against
+# the REPLAYED tree: aps/main is force-pushed CI output, so upstream's workflows never fire on
+# it — this is where their contract is upheld on the tree we actually ship. codespell,
+# docker-lint and json-validator ride scripts/replay.sh validate; twig-lint is its own step
+# (it needs PHP 8.5 + apcu, upstream's own setup). The drift report (org L7-2) is the
+# non-gating tail: swept-file content upstream added since the frozen baseline, annotated,
+# never fatal. Two companion jobs ride alongside: gate-red-proof (org L7-2 — the PR arm that
+# injects a known regression and asserts the gates CAN red) and liveness (org L7-5 — the
+# schedule's own enablement check).
 #
 # FORK-INFRA (the D6 allowlist; parity asserts everything else stays byte-identical): this
 # workflow, images.yml, scripts/, patches/, BUGS.md.
@@ -89,13 +95,21 @@ jobs:
       - name: Publish the sync (no-op when upstream has not moved)
         if: github.event_name != 'pull_request'
         run: |
-          # (P45) a sync whose merge carries upstream workflow changes needs the PAT too
+          # (P45) a sync whose merge carries upstream workflow changes needs the PAT too —
+          # carried on GIT_ASKPASS (org L7-6): the token never appears in a URL or argv.
+          # The helper is secret-free; it expands the env at prompt time and is removed on
+          # step exit.
           if [ -n "${APS_BOT_PAT:-}" ]; then
-            remote="https://x-access-token:${APS_BOT_PAT}@github.com/${GITHUB_REPOSITORY}.git"
-          else
-            remote=origin
+            askpass="$(mktemp)"
+            {
+              echo '#!/bin/sh'
+              echo 'case "$1" in *Username*) printf "x-access-token\n" ;; *) printf "%s\n" "$APS_BOT_PAT" ;; esac'
+            } >"$askpass"
+            chmod 700 "$askpass"
+            trap 'rm -f "$askpass"' EXIT
+            export GIT_ASKPASS="$askpass"
           fi
-          if ! git push "$remote" main; then
+          if ! git push origin main; then
             echo "main moved mid-run (a fork-infra PR merged) — re-run this workflow; nothing was lost" >&2
             exit 1
           fi
@@ -125,6 +139,101 @@ jobs:
         run: bash scripts/brand-gate.sh .aps-replay-tree
       - name: Acquisition gate
         run: bash scripts/acquisition-gate.sh .aps-replay-tree
+      - name: Wizard string drift report (org L7-2 — non-gating)
+        run: bash scripts/replay.sh drift-report
+
+  gate-red-proof:
+    name: Prove the gates can red (org L7-2)
+    # The PR arm the review asked for: brand-gate had four ledgered instances of arms that
+    # could not red (BUGS.md A-005, A-006, A-010, A-011) — each fixed ad-hoc because nothing
+    # stood beneath the fix. This job injects two known regressions into a replayed worktree
+    # and asserts the gate EXITS 1 on each: a reverted 060 sentinel (the sweep's own subject)
+    # and an upstream registry ref re-injected into containers.json (010/080's subject). A
+    # gate that stays green on a regression is a detector that stopped detecting — this is
+    # the standing proof it never becomes one again.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
+        with:
+          fetch-depth: 0   # the worktree base needs the fetched upstream history
+      - name: Replay the queue without publishing (the substrate the arms mutate)
+        run: bash scripts/replay.sh replay
+        env:
+          REPLAY_PUSH: "0"
+      - name: Baseline — the gate is green before any injection
+        run: bash scripts/brand-gate.sh .aps-replay-tree
+      - name: Arm A — revert a 060 sentinel, expect the gate to red
+        run: |
+          # the target comes from the gate's own live table (--sentinel-pair), so a
+          # regenerated 060 re-points the arm instead of the sed silently matching nothing
+          IFS='|' read -r f en es < <(bash scripts/brand-gate.sh --sentinel-pair 2)
+          grep -qF "$es" ".aps-replay-tree/$f" \
+            || { echo "ARM A target drifted — sentinel row 2 no longer matches the replayed bytes; re-point the arm" >&2; exit 1; }
+          sed -i "s#${es}#${en}#" ".aps-replay-tree/$f"
+          if bash scripts/brand-gate.sh .aps-replay-tree; then
+            echo "ARM A FAILED: the reverted sentinel ($en in $f) did NOT red the brand gate — a vacuous arm, org L7-2's rot class" >&2
+            exit 1
+          fi
+          echo "ARM A green: the reverted sentinel reds the gate"
+          # restore by reverting the sed, NOT git-checkout: the worktree's HEAD is the
+          # upstream tip, so a checkout would clobber the patched bytes and muddy Arm B
+          sed -i "s#${en}#${es}#" ".aps-replay-tree/$f"
+      - name: Arm B — re-inject an upstream registry ref, expect the gate to red
+        run: |
+          json=.aps-replay-tree/php/containers.json
+          grep -q 'ghcr.io/aps-conecta/' "$json" \
+            || { echo "ARM B target drifted — no aps-conecta refs in containers.json" >&2; exit 1; }
+          sed -i 's#ghcr.io/aps-conecta/#ghcr.io/nextcloud-releases/#g' "$json"
+          if bash scripts/brand-gate.sh .aps-replay-tree; then
+            echo "ARM B FAILED: upstream registry refs in containers.json did NOT red the brand gate" >&2
+            exit 1
+          fi
+          echo "ARM B green: the re-injected registry ref reds the gate"
+          # sed-revert for the same reason as Arm A — never git-checkout the patched bytes back
+          sed -i 's#ghcr.io/nextcloud-releases/#ghcr.io/aps-conecta/#g' "$json"
+
+  liveness:
+    name: Schedule liveness (org L7-5)
+    # The canary's own enablement was unverifiable org state: forks disable schedules by
+    # default, and a missed one-time Actions-tab chore left the ≤6-weeks drift bar with no
+    # enforcement until the next human push. This job rides every trigger the workflow
+    # already has, so the next push or PR reds while the schedule has been silent — and it
+    # is trivially green while the daily run actually runs. 7 days: the schedule is daily,
+    # so a week of silence means the chore is undone or scheduled runs are failing — either
+    # way a human must look, with the ≤6-weeks drift bar still in margin.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - name: Red if the last successful scheduled Replay run is older than 7 days
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json")
+          wf_id="$(curl -sf "${auth[@]}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows" \
+            | jq -r '.workflows[] | select(.path == ".github/workflows/replay.yml") | .id')"
+          [ -n "$wf_id" ] \
+            || { echo '::error::cannot resolve the Replay workflow id — the liveness query itself is broken (org L7-5)'; exit 1; }
+          last="$(curl -sf "${auth[@]}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${wf_id}/runs?event=schedule&status=success&per_page=1" \
+            | jq -r '.workflow_runs[0].created_at // empty')"
+          if [ -z "$last" ]; then
+            echo '::error::no successful scheduled Replay run has ever completed — the schedule is disabled: enable it once (Actions tab → Replay → ⋯ → Enable schedule), the one-time org chore (org L7-5)'
+            exit 1
+          fi
+          age=$(( ($(date +%s) - $(date -d "$last" +%s)) / 86400 ))
+          if [ "$age" -gt 7 ]; then
+            echo "::error::the last successful scheduled Replay run is ${age} days old — either the schedule got disabled again (re-enable: Actions tab → Replay → ⋯ → Enable schedule) or scheduled runs are failing (open the newest run; the drift bar is ≤6 weeks) (org L7-5)"
+            exit 1
+          fi
+          echo "liveness green: last successful scheduled Replay run was ${age} day(s) ago"
 
   publish:
     name: Hand off to the Images pipeline

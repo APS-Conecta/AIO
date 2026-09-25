@@ -88,6 +88,42 @@ fork_ref_floor() {  # FILE MIN — at least MIN ghcr.io/aps-conecta/ refs (line-
     || { echo "  only $n aps-conecta refs in $1 (floor $2) — the sed's prefix rule missed a ref shape, or the list shrank" >&2; return 1; }
 }
 
+swept_table() {  # 060's per-file sentinel table — ONE writer, three readers: escl_sweep walks
+  # it below (absent/present arms), --swept-files prints the file column (the wizard-string
+  # drift report's subject list, org L7-2), and --sentinel-pair N prints one row (the CI
+  # regression-injection arm's target — reading the live row keeps the arm pointed at real
+  # bytes across 060 regenerations instead of sed-ing nothing against a reworded table).
+  cat <<'EOF'
+php/templates/containers.twig|value="Log out"|value="Cerrar sesión"
+php/templates/includes/optional-containers.twig|value="Save changes"|value="Guardar cambios"
+php/templates/includes/community-containers.twig|Community Containers|Contenedores comunitarios
+php/templates/includes/aio-config.twig|Click here to view the current AIO config|Haga clic aquí para ver la configuración actual
+php/templates/includes/backup-dirs.twig|An example for Linux is|Un ejemplo para Linux es
+php/templates/components/container-state.twig|>Stopped</a>|>Detenido</a>
+php/templates/setup.twig|All-in-One setup|Anote la frase de contraseña
+php/templates/login.twig|Nextcloud AIO Login|Inicie sesión con su frase de contraseña de Nextcloud AIO
+php/templates/already-installed.twig|is already installed|ya está instalado
+php/templates/log.twig|>Disable</button>|>Desactivar</button>
+php/templates/layout.twig|<html lang="en">|<html lang="es">
+php/public/forms.js|Server error. Please check|Error del servidor.
+php/public/second-tab-warning.js|Cannot open multiple instances|No se pueden abrir múltiples instancias
+php/public/containers-form-submit.js|The docker socket proxy container is deprecated|El contenedor docker socket proxy está obsoleto
+php/public/log-load.js|statusElem.textContent = 'enabled';|statusElem.textContent = 'activada';
+EOF
+}
+
+case "${1:-}" in  # the self-test hooks org L7-2's CI arms drive — print-and-exit, no tree needed
+  --swept-files)
+    swept_table | cut -d'|' -f1
+    exit 0
+    ;;
+  --sentinel-pair)
+    row="$(swept_table | sed -n "${2:?usage: scripts/brand-gate.sh --sentinel-pair N}p")"
+    [ -n "$row" ] || die "--sentinel-pair ${2}: no such row in 060's sentinel table (1-$(swept_table | wc -l))"
+    printf '%s\n' "$row"
+    exit 0
+    ;;
+esac
 
 TREE="${1:?usage: scripts/brand-gate.sh TREE (the replayed tree, e.g. .aps-replay-tree)}"
 [ -d "$TREE/php" ] || die "'$TREE' does not look like the replayed tree (no php/ in it)"
@@ -161,11 +197,12 @@ fork_changelog_present() {  # the positive control: the changelog arms point at 
   grep -q 'https://github.com/APS-Conecta/AIO/releases' "$TREE/php/templates/containers.twig"     || { echo "  no APS-Conecta/AIO releases URL in containers.twig — the changelog arms point nowhere" >&2; return 1; }
 }
 
-escl_sweep() {  # MODE — walk 060's per-file sentinel table. absent = the English sentinel must be
+escl_sweep() {  # MODE — walk swept_table's sentinel pairs. absent = the English sentinel must be
   # gone (an unreplayed 060 leaves upstream English in place and reds loudly); present = the
   # es-CL sentinel must be there (a half-applied or mis-regenerated sweep loses a whole FILE —
   # exactly what this canary exists to catch, the 050 ids/floor precedent at row granularity).
   # One sentinel pair per swept file; the sweep's full proof is the patch's own edit points.
+  # The table lives in swept_table() above — one writer, three readers (org L7-2).
   # AMENDED WITH SLICE 12 (070's forced extension): the setup and login present-arms pointed at
   # the h1 lines the reskin renames ("Configuración de All-in-One", "Inicio de sesión de
   # Nextcloud AIO") — a sentinel that dies under a later queued patch is a row that reds
@@ -183,23 +220,7 @@ escl_sweep() {  # MODE — walk 060's per-file sentinel table. absent = the Engl
     else
       grep -qF "$es" "$TREE/$f" || { echo "  no es-CL sentinel in $f — the translation is missing" >&2; fail=1; }
     fi
-  done <<'EOF'
-php/templates/containers.twig|value="Log out"|value="Cerrar sesión"
-php/templates/includes/optional-containers.twig|value="Save changes"|value="Guardar cambios"
-php/templates/includes/community-containers.twig|Community Containers|Contenedores comunitarios
-php/templates/includes/aio-config.twig|Click here to view the current AIO config|Haga clic aquí para ver la configuración actual
-php/templates/includes/backup-dirs.twig|An example for Linux is|Un ejemplo para Linux es
-php/templates/components/container-state.twig|>Stopped</a>|>Detenido</a>
-php/templates/setup.twig|All-in-One setup|Anote la frase de contraseña
-php/templates/login.twig|Nextcloud AIO Login|Inicie sesión con su frase de contraseña de Nextcloud AIO
-php/templates/already-installed.twig|is already installed|ya está instalado
-php/templates/log.twig|>Disable</button>|>Desactivar</button>
-php/templates/layout.twig|<html lang="en">|<html lang="es">
-php/public/forms.js|Server error. Please check|Error del servidor.
-php/public/second-tab-warning.js|Cannot open multiple instances|No se pueden abrir múltiples instancias
-php/public/containers-form-submit.js|The docker socket proxy container is deprecated|El contenedor docker socket proxy está obsoleto
-php/public/log-load.js|statusElem.textContent = 'enabled';|statusElem.textContent = 'activada';
-EOF
+  done < <(swept_table)
   [ "$fail" -eq 0 ]
 }
 

@@ -61,6 +61,31 @@ APS_BRANCH="${REPLAY_APS_BRANCH:-aps/main}"
 WT="${REPLAY_TREE:-$REPO_ROOT/.aps-replay-tree}"
 TMPD="$(mktemp -d)"; trap 'rm -rf "$TMPD"' EXIT
 
+# (org L7-6) The PAT used to ride an https://x-access-token:PAT@… URL passed as git-push
+# argv — visible in `ps` output and covered only by git's version-dependent transport-error
+# redaction. It now answers git's own credential prompt through GIT_ASKPASS: the helper is
+# secret-free (it expands the environment at prompt time), lives in the trap-cleaned TMPD,
+# and only ever speaks when git actually asks for credentials — which is only ever a push to
+# the private fork (fetching public upstream never prompts).
+if [ -n "${APS_BOT_PAT:-}" ]; then
+  ASKPASS="$TMPD/git-askpass"
+  cat >"$ASKPASS" <<'HELPER'
+#!/bin/sh
+# git calls this once per credential prompt, prompt text as its only argument — Username first, then Password.
+case "$1" in *Username*) printf 'x-access-token\n' ;; *) printf '%s\n' "$APS_BOT_PAT" ;; esac
+HELPER
+  chmod 700 "$ASKPASS"
+  export GIT_ASKPASS="$ASKPASS"
+fi
+
+# (org L7-2) The frozen wizard-string baseline: the upstream commit 060's sweep was last
+# proven against. The drift report diffs the swept files between this sha and the current
+# upstream tip — every added line is upstream content the queue never absorbed, the exact
+# blind spot of the sentinel design (a NEW English string in a swept file passes every arm
+# green). Non-gating by accepted resolution: it reports and annotates, never fails the run.
+# Re-freeze with 'scripts/replay.sh drift-freeze' whenever 060 is regenerated.
+WIZARD_BASELINE="$REPO_ROOT/scripts/wizard-drift-baseline"
+
 die() { echo "FATAL: $*" >&2; exit 1; }
 say() { printf '  %s\n' "$*"; }
 usage() {
@@ -70,6 +95,10 @@ usage: scripts/replay.sh <command>
   sync              merge upstream/main into main (local; the workflow pushes)
   replay            the queue: three-outcome apply into a worktree, force-push aps/main
   validate TREE     upstream validators (codespell, docker-lint, json-validator) against TREE
+  drift-report      wizard-string drift report (org L7-2, non-gating): the swept files at the
+                    upstream tip vs the frozen baseline — new content the 060 queue never
+                    absorbed; operator-visible English among it means regenerate 060
+  drift-freeze      re-freeze the wizard-string baseline at the current upstream tip
 EOF
 }
 
@@ -96,16 +125,9 @@ strip_declaration() {  # FILE — the marker-delimited fork declaration, deleted
 
 # (P45, landing flow) patch 090's queue is the first to modify .github/workflows/**, and the
 # GITHUB_TOKEN can NEVER push workflow files — the aps/main force-push (and any sync push whose
-# merge carries upstream workflow changes) needs a PAT. When APS_BOT_PAT is present it carries
-# every publish push; without it the plain remote answers (fine until a workflow file moves).
-push_target() {
-  if [ -n "${APS_BOT_PAT:-}" ]; then
-    local repo="${GITHUB_REPOSITORY:-$(git remote get-url "$FORK" | sed 's#.*github.com[:/]##; s#\\.git$##')}"
-    printf 'https://x-access-token:%s@github.com/%s.git' "$APS_BOT_PAT" "$repo"
-  else
-    printf '%s' "$FORK"
-  fi
-}
+# merge carries upstream workflow changes) needs a PAT. The PAT rides GIT_ASKPASS (org L7-6,
+# see the setup block above) — pushes below name the plain remote; when git needs credentials,
+# the askpass helper supplies x-access-token/PAT without the token ever reaching a URL or argv.
 allowlisted() {  # PATH
   case "$1" in
     .github/workflows/images.yml|.github/workflows/replay.yml|.codespellrc|BUGS.md) return 0 ;;
@@ -209,6 +231,15 @@ cmd_replay() {
           say "  applied $(basename "$p")"
         elif git -C "$WT" apply --check --reverse "$p" 2>/dev/null; then
           say "  already applied: $(basename "$p") — upstream adopted this change; consider dropping the patch"
+          # (org L7-4) "already applied" was a log line in a scheduled-run log nobody reads —
+          # scheduled-run logs are not an alerting surface. The annotation puts every skip on
+          # the run's face in the Actions UI and carries the queue-hygiene rule itself: two
+          # consecutive scheduled-run skips must end in the patch being dropped or re-justified
+          # in its header. The consecutive count stays a maintainer's eyeball count on the
+          # daily annotations on purpose — a cross-run mechanical ledger would need state
+          # committed to the mirror, heavy machinery for a hygiene signal the tree stays
+          # correct without.
+          echo "::warning::patch $(basename "$p") is already applied by upstream — drop it, or re-justify keeping it in the patch header (queue hygiene: two consecutive scheduled-run skips must end in drop-or-rejustify; org L7-4)"
         else
           die "patch $(basename "$p") no longer applies — upstream moved; regenerate it (ADR-0002's abort outcome; the drift bar is ≤6 weeks)"
         fi ;;
@@ -232,7 +263,7 @@ cmd_replay() {
   git -C "$WT" add -A
   if git -C "$WT" diff --cached --quiet; then
     say "queue produced no tree changes — aps/main = upstream ${base:0:12}"
-    git push --force "$(push_target)" "$base:refs/heads/$APS_BRANCH" \
+    git push --force "$FORK" "$base:refs/heads/$APS_BRANCH" \
       || die "cannot push aps/main (upstream tip) to $FORK — check contents: write"
   else
     git -C "$WT" -c user.name="aps-replay" -c user.email="replay@aps-conecta.invalid" \
@@ -240,7 +271,7 @@ cmd_replay() {
     # -C "$WT": HEAD is the WORKTREE's replay commit — a bare push would run in this checkout's
     # cwd and publish MAIN's tip instead (the de-risk caught exactly this). The base push above
     # is sha-based and cwd-independent; this one names a ref, so it must run in the worktree.
-    git -C "$WT" push --force "$(push_target)" "HEAD:refs/heads/$APS_BRANCH" \
+    git -C "$WT" push --force "$FORK" "HEAD:refs/heads/$APS_BRANCH" \
       || die "cannot force-push aps/main to $FORK — aps/main is CI output; main itself is never forced"
   fi
   echo "REPLAY: ${n} patch(es) over upstream ${base:0:12} -> $APS_BRANCH (worktree kept at $WT for validate/gates)"
@@ -287,10 +318,46 @@ cmd_validate() {
   echo "VALIDATE: PASS — codespell, docker-lint, json-validator green against $tree (twig-lint rides the workflow's PHP step)"
 }
 
+cmd_drift_report() {
+  # (org L7-2, the non-gating half) The sentinel design cannot see NEW upstream strings — a
+  # fresh English line in a swept file passes every escl_sweep arm green. This report closes
+  # the visibility gap: everything upstream ADDED to a swept file since the frozen baseline
+  # prints as a warning annotation, with the regenerate-060 instruction riding the warning.
+  # The baseline freezes the upstream tip the current 060 was proven against, so the diff is
+  # exactly "what upstream did to the wizard's surfaces that the queue never absorbed". Code
+  # lines land in the report too — a maintainer filters by eye; the report never gates.
+  [ -f "$WIZARD_BASELINE" ] \
+    || die "scripts/wizard-drift-baseline is missing — freeze one with 'scripts/replay.sh drift-freeze' before the drift report can run"
+  fetch_upstream
+  local base f line new=0
+  base="$(cat "$WIZARD_BASELINE")"
+  git rev-parse --verify --quiet "${base}^{commit}" >/dev/null \
+    || die "the frozen baseline sha ${base} is not reachable — re-freeze against a fetched upstream commit ('scripts/replay.sh drift-freeze')"
+  while IFS= read -r f; do
+    while IFS= read -r line; do
+      printf '::warning::wizard drift in %s — upstream content the 060 sweep never absorbed: %s (review for operator-visible English; regenerate 060 if any)\n' "$f" "$line"
+      new=$((new + 1))
+    done < <(git diff "$base" "$UP/main" -- "$f" | sed -n -e '/^+++/d' -e '/^+$/d' -e 's/^+//p')
+  done < <(bash "$REPO_ROOT/scripts/brand-gate.sh" --swept-files)
+  if [ "$new" -gt 0 ]; then
+    echo "WIZARD DRIFT: $new new line(s) in the swept files since the frozen baseline — operator-visible English among them means 060 must be regenerated (non-gating: this report never fails the run)"
+  else
+    echo "WIZARD DRIFT: none — upstream moved no swept file since the frozen baseline"
+  fi
+}
+
+cmd_drift_freeze() {
+  fetch_upstream
+  git rev-parse "$UP/main" >"$WIZARD_BASELINE"
+  say "wizard-string baseline frozen at $(cat "$WIZARD_BASELINE") (the upstream tip) — run this whenever 060 is regenerated, so the drift report measures from the new cut point"
+}
+
 case "${1:-}" in
-  parity)   shift; cmd_parity "$@" ;;
-  sync)     shift; cmd_sync "$@" ;;
-  replay)   shift; cmd_replay "$@" ;;
-  validate) shift; cmd_validate "$@" ;;
-  *)        usage; exit 1 ;;
+  parity)        shift; cmd_parity "$@" ;;
+  sync)          shift; cmd_sync "$@" ;;
+  replay)        shift; cmd_replay "$@" ;;
+  validate)      shift; cmd_validate "$@" ;;
+  drift-report)  shift; cmd_drift_report "$@" ;;
+  drift-freeze)  shift; cmd_drift_freeze "$@" ;;
+  *)             usage; exit 1 ;;
 esac

@@ -62,6 +62,15 @@ suite's install story: the suite's documentation is this repository plus gestion
 `docs/INSTALLER.md`, never the label's target. This repository is the source of the
 modifications.
 
+**Schedules.** The only schedule this fork runs is the Replay workflow's daily run — enable
+it once in the Actions tab (the workflow's liveness job reds on the next push or PR if it
+stays off). Upstream's own scheduled workflows (`collabora`, `dependency-updates`,
+`desec-api-version-watch`, `imaginary-update`, `lock-threads`, `nextcloud-update`,
+`psalm-update-baseline`, `sync-workflow-templates`, `talk`, `update-helm`,
+`update-test-container-image-references`, `update-yaml`, `watchtower-update`,
+`wg-easy-update`) are expected disabled here: the fork takes every upstream change through
+the mirror sync, and none of upstream's scheduled automation should act on this repository.
+
 **License.** The upstream [LICENSE](LICENSE) (AGPL-3.0) is carried unchanged. The complete
 corresponding source of every suite image is this repository at the matching suite tag: the
 `main` branch's upstream history plus the patch queue is the whole of it.

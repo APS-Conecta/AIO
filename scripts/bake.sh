@@ -134,17 +134,24 @@ done
 # — the white-label asserts, moved here from office-smoke.sh:37 per FRD S3. Both halves, the
 # same file:string pairs the runtime grep owned, so a patch regeneration that silently stopped
 # renaming fails the build instead of shipping "Nextcloud Office" back into the admin UI.
-if [ -d "$OUT/custom_apps/eurooffice" ]; then
-  while IFS= read -r f_want; do
-    f="${f_want%%:*}"; wantstr="${f_want#*:}"
-    grep -qF -- "$wantstr" "$OUT/custom_apps/eurooffice/$f" \
-      || die "white-label rename missing from eurooffice/$f — the patch applied but the rename is not in the served file; regenerate the patch against the real tarball"
-  done <<'EOF'
+# (org L7-3) These asserts used to sit inside `if [ -d … eurooffice ]` — a gestion refactor
+# dropping the app would have shipped an office-less image with every gate green (the
+# notify_push floor above is the deliberate contrast this was missing). The floor is now
+# mandatory exactly like notify_push's, the asserts run unconditionally, and a renamed file
+# reds instead of skipping: each iteration proves the file exists before it proves the rename.
+[ -d "$OUT/custom_apps/eurooffice" ] \
+  || die "custom_apps/eurooffice is absent from the bake — the suite's office ships baked (the store is off, 020) and the white-label asserts below run on its served files; an office-less bake with every gate green is exactly the regression this floor exists to catch (org L7-3)"
+while IFS= read -r f_want; do
+  f="${f_want%%:*}"; wantstr="${f_want#*:}"
+  [ -f "$OUT/custom_apps/eurooffice/$f" ] \
+    || die "eurooffice/$f is missing from the bake — a renamed file must red, never skip (org L7-3); regenerate the white-label patch against the real tarball"
+  grep -qF -- "$wantstr" "$OUT/custom_apps/eurooffice/$f" \
+    || die "white-label rename missing from eurooffice/$f — the patch applied but the rename is not in the served file; regenerate the patch against the real tarball"
+done <<'EOF'
 lib/AdminSection.php:Euro-Office
 appinfo/info.xml:<name>Euro-Office</name>
 EOF
-  say "white-label asserts green (eurooffice: AdminSection.php + info.xml)"
-fi
+say "white-label asserts green (eurooffice: AdminSection.php + info.xml)"
 
 # — the theme, whole-dir (probe parity: the slice-1 harness docker-cp'd exactly this tree and
 # smoke's checks 7/11 passed against it; tools/ and MAPEO.md ride — inert, and a future theme
