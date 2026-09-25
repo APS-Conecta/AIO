@@ -186,7 +186,7 @@ office_overview_disabled() {  # the entrypoint kills the first-party `office` ap
   grep -q 'occ app:disable office' "$TREE/Containers/nextcloud/entrypoint.sh"
 }
 
-row 100 "the first-party `office` overview app is disabled whenever the suite's office app is EuroOffice — NC34 ships it enabled by default, unwired to EuroOffice (no editor-url), a name-colliding dead surface; the entrypoint owns the kill so every install and reboot re-asserts it (the 2026-09-23 owner flip of the 2026-07-31 'not a duplicate' verdict)" \
+row 100 "the first-party 'office' overview app is disabled whenever the suite's office app is EuroOffice — NC34 ships it enabled by default, unwired to EuroOffice (no editor-url), a name-colliding dead surface; the entrypoint owns the kill so every install and reboot re-asserts it (the 2026-09-23 owner flip of the 2026-07-31 'not a duplicate' verdict)" \
   office_overview_disabled
 
 upstream_changelog_urls_absent() {  # zero upstream changelog/releases URLs in the templates
