@@ -195,7 +195,10 @@ cmd_sync() {
     say "mirror current — upstream is already contained in main"
     return 0
   fi
-  git merge --no-edit "$UP/main" \
+  # Identity rides the merge itself (cmd_replay's own idiom for its commit): the runner image
+  # ships NO default git identity ("Committer identity unknown", red 2026-09-24/25 runs), and
+  # an env-level config would leak the choice into every other git call this script makes.
+  git -c user.name="aps-sync" -c user.email="sync@aps-conecta.invalid" merge --no-edit "$UP/main" \
     || die "merge failed — upstream touched a fork-infra path, or histories diverged; resolve by hand and NEVER force main (the loud path is the correct one)"
   say "mirror synced: upstream merged into main — push it (the workflow does; locally: git push $FORK main)"
 }
