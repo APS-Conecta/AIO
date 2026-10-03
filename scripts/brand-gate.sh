@@ -788,6 +788,33 @@ container_name_patterns() {  # 240: what matches containers by pattern follows t
 row 240 'what matches containers by pattern follows the new names — the six entrypoint host checks, the two schema patterns, the three log-route guards (the mastercontainer still allowed), both name lists in the test harness' \
   container_name_patterns
 
+# ── L4 S6: the install by IP over HTTPS (R22) ──────────────────────────────────────────────────
+
+# shellcheck disable=SC2016  # the PHP and spec lines are matched as bytes; $domain is theirs, not ours
+ip_when_skipped() {  # 233: an IP is a valid domain while domain validation is skipped — the suite's install
+  # by IP over HTTPS with the installer's own certificate (R22, declared PHP). With validation on an IP is
+  # still refused, and the suite asserts that in restore-instance; initial-setup skips validation, so its
+  # old IP-refusal step is gone.
+  local m="$TREE/php/src/Data/ConfigurationManager.php" t="$TREE/php/tests/tests" fail=0
+  s3_files "$m" "$t/initial-setup.spec.js" "$t/restore-instance.spec.js" || return 1
+  grep -A1 -F 'if(filter_var($domain, FILTER_VALIDATE_IP) && !$this->shouldDomainValidationBeSkipped($skipDomainValidation)) {' "$m" \
+    | grep -qF 'throw new InvalidSettingConfigurationException("Please enter a domain and not an IP-address!");' \
+    || { echo "  setDomain does not refuse an IP only while domain validation is on" >&2; fail=1; }
+  if grep -nF 'if(filter_var($domain, FILTER_VALIDATE_IP)) {' "$m"; then
+    echo "  setDomain still refuses every IP" >&2; fail=1
+  fi
+  if grep -nF "fill('1.1.1.1')" "$t/initial-setup.spec.js"; then
+    echo "  initial-setup.spec.js still expects an IP refused while it skips validation" >&2; fail=1
+  fi
+  grep -A2 -F "fill('1.1.1.1')" "$t/restore-instance.spec.js" \
+    | grep -qF "toContainText('Please enter a domain and not an IP-address!')" \
+    || { echo "  restore-instance.spec.js does not assert the IP refusal with validation on" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 233 'an IP is accepted as the domain only while domain validation is skipped — the install by IP over HTTPS (R22, declared PHP); with validation on it is refused, and the suite asserts that in restore-instance' \
+  ip_when_skipped
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
