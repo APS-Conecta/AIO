@@ -28,6 +28,7 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 110 | the wizard's content security policy lets its own brand fonts load |
 | 120 | the banner lockup drawn as outlines (`scripts/lockup.py`), so it needs no font |
 | 130 | the product named «APS Conecta Gestión AIO» on every wizard surface |
+| 140 | the wizard's help links pointed at the suite's own docs (gestion's INSTALLER and GUIA-CLINICA), the rest removed |
 
 **No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
 an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates
@@ -56,8 +57,8 @@ these as its own canary that the sweep never bled into PHP.
 
 **Nominative use.** The wizard names itself «APS Conecta Gestión AIO»; translated prose keeps
 «Nextcloud» where the sentence is about the software inside the suite («su Nextcloud»), and the
-wizard's documentation links point at Nextcloud's own manuals on purpose — those documents
-describe the software the clinic runs. The image labels are byte-identical upstream,
+wizard's help links point at the suite's own docs — gestion's `docs/INSTALLER.md` and
+`docs/GUIA-CLINICA.md`. The image labels are byte-identical upstream,
 deliberately, and both readings are recorded: `org.opencontainers.image.vendor` says
 "Nextcloud" — true and honest nominative use, the software inside the image IS Nextcloud,
 with this declaration carrying the fork's attribution — and `org.opencontainers.image.url`

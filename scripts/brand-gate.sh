@@ -584,6 +584,43 @@ row 120 "the banner lockup is outlines — no text, no embedded font, two outlin
 row 130 "the product name is APS Conecta Gestión AIO on every operator surface — titles, headings, the setup link the suite clicks, and no upstream or pre-Gestión name left (R19)" \
   product_name
 
+# ── L4 S3: the wizard page (R23 links, R24 defaults, R25 page choices, R27 post-start, phones) ──
+
+s3_files() {  # PATH... — every file an S3 row reads must exist: a negative arm over a moved file
+  # would pass vacuously (grep's «no such file» reads as «no hit»)
+  local f fail=0
+  for f in "$@"; do [ -f "$f" ] || { echo "  no such file: $f — re-point this row" >&2; fail=1; }; done
+  [ "$fail" -eq 0 ]
+}
+
+help_links_ours() {  # 140: every help link the wizard renders goes to the suite's own docs, or is
+  # gone (R23). No URL of upstream's GitHub, Nextcloud's sites or the App API repo in any
+  # template or public text file — links and twig comments alike; the container list no longer
+  # renders containers.json's upstream documentation URLs; the platform examples the suite never
+  # runs on are gone; and each section of gestion's docs the links were mapped to is linked
+  # (the positive control).
+  local t="$TREE/php/templates" fail=0 a
+  s3_files "$t/components/container-state.twig" "$t/includes/backup-dirs.twig" || return 1
+  if grep -rnIE 'github\.com/(nextcloud|nextcloud-releases|cloud-py-api)/|([a-z0-9-]+\.)*nextcloud\.com' "$t" "$TREE/php/public"; then
+    echo "  an upstream URL survives on a wizard surface" >&2; fail=1
+  fi
+  if grep -n 'c.documentation' "$t/components/container-state.twig"; then
+    echo "  the container list still renders containers.json's upstream documentation links" >&2; fail=1
+  fi
+  if grep -nE 'Synology|macOS|Windows' "$t/includes/backup-dirs.twig"; then
+    echo "  backup-dirs.twig still offers platforms the suite does not run on" >&2; fail=1
+  fi
+  for a in INSTALLER.md#3-preflight INSTALLER.md#7-dns-the-host-must-reach-its-own-domain-d10 \
+           INSTALLER.md#11-backups INSTALLER.md#12-troubleshooting GUIA-CLINICA.md#3-el-asistente-8080; do
+    grep -rqF "https://github.com/APS-Conecta/gestion/blob/main/docs/$a" "$t" \
+      || { echo "  no link to gestion's docs/$a" >&2; fail=1; }
+  done
+  [ "$fail" -eq 0 ]
+}
+
+row 140 "every help link on the wizard goes to the suite's own docs or is gone — no upstream GitHub, Nextcloud site or App API URL, no per-container upstream documentation link, no Synology/macOS/Windows examples, each mapped gestion doc section linked (R23)" \
+  help_links_ours
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
