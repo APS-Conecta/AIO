@@ -556,7 +556,7 @@ product_name() {  # 130: «APS Conecta Gestión AIO» on every operator surface 
   done <<'EOF'
 php/templates/layout.twig|<title>APS Conecta Gestión AIO — Instalador</title>
 php/templates/log.twig|<title>APS Conecta Gestión AIO — Instalador</title>
-php/templates/containers.twig|<h1>APS Conecta Gestión AIO v
+php/templates/containers.twig|<h1>APS Conecta Gestión AIO
 php/templates/setup.twig|<h1>Configuración de APS Conecta Gestión AIO</h1>
 php/templates/login.twig|<h1>Inicio de sesión de APS Conecta Gestión AIO</h1>
 php/templates/already-installed.twig|<h2>APS Conecta Gestión AIO ya está instalado</h2>
@@ -643,6 +643,33 @@ EOF
 
 row 150 "the wizard proposes the suite's values — America/Santiago, /srv/aps-conecta/respaldos, a gestion domain pattern — and no upstream example is left (R24)" \
   aps_defaults
+
+page_choices() {  # 160: the page offers only what the suite ships (R25, its template part): the
+  # baked Nextcloud Hub (no newer-major checkbox, no upgrade note), the suite's version — its
+  # image tag — in the heading instead of upstream AIO's, the office card named for what it is
+  # with no comparison against the removed cards, the deprecated docker socket proxy and HaRP
+  # hidden, and no «mastercontainer» jargon in the prose (the asistente, as gestion's docs call
+  # it; ids and commands keep the container's real name). The server-side refusals are S4's.
+  local c="$TREE/php/templates/containers.twig" o="$TREE/php/templates/includes/optional-containers.twig" fail=0 id
+  s3_files "$c" "$o" "$TREE/php/public/forms.js" || return 1
+  grep -qF "{% set newMajorVersionString = '' %}" "$c" || { echo "  the Hub major-version choice is still offered" >&2; fail=1; }
+  grep -qF '<h1>APS Conecta Gestión AIO {{ current_channel }}</h1>' "$c" || { echo "  the heading does not show the suite version" >&2; fail=1; }
+  if grep -n 'aio-version.twig' "$c"; then echo "  the heading still reads upstream AIO's version" >&2; fail=1; fi
+  grep -qF '<h4>Oficina</h4>' "$o" || { echo "  the office card is not titled Oficina" >&2; fail=1; }
+  if grep -nE 'Nextcloud Office|Mejor rendimiento|Compatibilidad ODF limitada|Mejor compatibilidad con Microsoft' "$o"; then
+    echo "  the office card still names or compares against upstream's suites" >&2; fail=1
+  fi
+  for id in docker-socket-proxy harp; do
+    tr -d '\n' < "$o" | grep -qE "<p hidden> *<input +type=\"checkbox\" +id=\"$id\"" || { echo "  the $id option is visible" >&2; fail=1; }
+  done
+  if grep -nE '(^|[^-_[:alnum:]])mastercontainer([^-_[:alnum:]]|$)' "$c" "$TREE/php/public/forms.js" | grep -v '{#'; then
+    echo "  «mastercontainer» jargon survives in the wizard's prose" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+row 160 "the page offers only what the suite ships — no Hub major-version choice, the suite version in the heading, the office card titled Oficina, the docker socket proxy and HaRP hidden, no mastercontainer jargon (R25, its template part)" \
+  page_choices
 
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2

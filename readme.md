@@ -30,6 +30,7 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 130 | the product named «APS Conecta Gestión AIO» on every wizard surface |
 | 140 | the wizard's help links pointed at the suite's own docs (gestion's INSTALLER and GUIA-CLINICA), the rest removed |
 | 150 | the suite's values pre-filled — America/Santiago, `/srv/aps-conecta/respaldos`, a gestion domain pattern |
+| 160 | the page offers only what the suite ships — the baked Hub, the suite version, the office card, no ExApp proxies, no «mastercontainer» jargon |
 
 **No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
 an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates
