@@ -1,13 +1,15 @@
-# S1 — the lockstep image pipeline. 20 images under ghcr.io/aps-conecta/* per suite tag: 18
+# S1 — the lockstep image pipeline. 20 images under ghcr.io/aps-conecta/* per suite tag: 17
 # registry-side retags of upstream (docker buildx imagetools create — seconds, zero runner disk, the
-# multi-arch manifest list carried byte-for-byte) + 2 real builds (aio-nextcloud, the apps+theme
-# bake that patch 030 slots in; all-in-one, the mastercontainer reskin that patch 070 slots in).
+# multi-arch manifest list carried byte-for-byte) + 3 real builds (aio-nextcloud, the apps+theme
+# bake that patch 030 slots in; aio-apache, the web front serving the installer's own certificate
+# that patch 235 slots in; all-in-one, the mastercontainer reskin that patch 070 slots in). The
+# builds are x86-64 only: the suite's documented server requirement.
 #
 # WHY THE MATRIX GATES THE ANNOUNCE. The wizard resolves every sibling's tag from the mastercontainer's
 # own running image tag (%AIO_CHANNEL% -> the channel = the tag the operator ran,
 # php/src/Docker/DockerActionManager.php BuildImageName). One tag, twenty images: a missing tag is
 # not "one feature down" — the wizard's registry-reachability checks fail the whole start. Existence
-# alone is not enough either: the matrix also proves the 18 retagged images match ONE upstream
+# alone is not enough either: the matrix also proves the 17 retagged images match ONE upstream
 # snapshot (a walk that straddled an upstream release would mix two releases inside one suite tag),
 # and the boot smoke proves the pushed mastercontainer actually PULLS and BOOTS — manifest-inspect
 # never reads a layer byte, so a broken push is invisible to it.
@@ -18,11 +20,11 @@
 # the replay chain's hand-off passes aps/main explicitly anyway; with 030 queued that mode
 # builds the UNBAKED upstream nextcloud image — the bake's Dockerfile lines are themselves a
 # patch, so the two trees disagree by construction, and a suite tag is never published from
-# it). Only the two BUILD jobs read build-ref (the Dockerfiles — upstream files, present on
+# it). Only the three BUILD jobs read build-ref (the Dockerfiles — upstream files, present on
 # every ref; the bake's COPY sources are workflow-materialized, on every ref alike);
 # scripts/retag.sh runs from main's checkout everywhere, so no job depends on the generated
-# branch carrying fork-infra. The two build jobs refuse to mix trees: the manifest job asserts
-# both builds resolved the same commit of build-ref.
+# branch carrying fork-infra. The three build jobs refuse to mix trees: the manifest job asserts
+# all three resolved the same commit of build-ref.
 #
 # IMMUTABILITY. A published tag's digests never move (D12: one distribution, one version). The retag
 # job refuses a fully-present set without force, and the builds run needs: retag so the refusal also
@@ -32,7 +34,7 @@
 #
 # SECRETS. Only the ephemeral GITHUB_TOKEN (org-linked, packages:write where a job pushes). No PAT
 # lives in this repo: the read:packages PAT is the OPERATOR-side install step (R2's decision), never
-# CI's. Per-job permissions are least-privilege: write only in the three jobs that push.
+# CI's. Per-job permissions are least-privilege: write only in the four jobs that push.
 #
 # ACTIONS ARE SHA-PINNED — upstream's own convention in every workflow it ships, and load-bearing
 # here: the mirror's lint-yaml runs zizmor --min-severity medium over .github/workflows on PRs, and
@@ -65,7 +67,7 @@ on:
         required: true
         type: string
       build-ref:
-        description: "The ref the 2 real builds check out. aps/main = the replayed (patched) tree — the default since S4. main = the byte-identical mirror, unpatched — deliberate repair/testing only (with the bake queued, that means the UNBAKED upstream nextcloud image)."
+        description: "The ref the 3 real builds check out. aps/main = the replayed (patched) tree — the default since S4. main = the byte-identical mirror, unpatched — deliberate repair/testing only (with the bake queued, that means the UNBAKED upstream nextcloud image)."
         required: false
         default: aps/main
         type: string
@@ -75,7 +77,7 @@ on:
         default: main
         type: string
       upstream-channel:
-        description: "The upstream channel the 18 registry-side retags copy from (ghcr.io/nextcloud-releases/<image>:<channel>)."
+        description: "The upstream channel the 17 registry-side retags copy from (ghcr.io/nextcloud-releases/<image>:<channel>)."
         required: false
         default: latest
         type: string
@@ -120,7 +122,7 @@ concurrency:
 
 jobs:
   retag:
-    name: Retag the 18 registry-side images
+    name: Retag the 17 registry-side images
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -231,9 +233,40 @@ jobs:
           cache-from: type=gha,scope=all-in-one
           cache-to: type=gha,mode=max,scope=all-in-one
 
+  build-aio-apache:
+    name: Build aio-apache (the installer certificate's slot)
+    needs: retag   # same gate as the other builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (upstream's own pin)
+        with:
+          ref: ${{ inputs.build-ref }}
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: Containers/apache   # the Dockerfile copies its Caddyfile and start.sh from its own directory
+          file: Containers/apache/Dockerfile
+          push: true
+          tags: ghcr.io/aps-conecta/aio-apache:${{ inputs.suite-tag }}
+          cache-from: type=gha,scope=aio-apache
+          cache-to: type=gha,mode=max,scope=aio-apache
+
   matrix:
     name: Tag-completeness matrix (the gate)
-    needs: [retag, build-aio-nextcloud, build-all-in-one]
+    needs: [retag, build-aio-nextcloud, build-all-in-one, build-aio-apache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -314,11 +347,11 @@ jobs:
   manifest:
     name: Digest manifest (the announce)
     # The builds are listed DIRECTLY, not left to transitivity: the needs context only exposes
-    # outputs of direct dependencies, so without these two entries SHA_A/SHA_B/RETAG_BUILT_SHA
-    # below would resolve empty — the built-pair lockstep assert would compare '' to '' and stay
+    # outputs of direct dependencies, so without these entries SHA_A/SHA_B/SHA_C/RETAG_BUILT_SHA
+    # below would resolve empty — the built-set lockstep assert would compare '' to '' and stay
     # green for the wrong reason (B-014). No ordering change: the builds are already ancestors
     # via matrix.
-    needs: [matrix, boot-smoke, build-aio-nextcloud, build-all-in-one]
+    needs: [matrix, boot-smoke, build-aio-nextcloud, build-all-in-one, build-aio-apache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -331,16 +364,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: The two builds must come from one tree (lockstep for the built pair)
+      - name: The three builds must come from one tree (lockstep for the built set)
         run: |
           set -euo pipefail
-          if [ "$SHA_A" != "$SHA_B" ]; then
-            echo "FAIL: the two builds checked out different commits of '$BUILD_REF' — the ref moved mid-run; re-run the pipeline" >&2
+          echo "built from: ${SHA_A:-<empty>} ${SHA_B:-<empty>} ${SHA_C:-<empty>}"
+          if [ -z "$SHA_A" ] || [ "$SHA_A" != "$SHA_B" ] || [ "$SHA_A" != "$SHA_C" ]; then
+            echo "FAIL: the three builds checked out different commits of '$BUILD_REF' — the ref moved mid-run; re-run the pipeline" >&2
             exit 1
           fi
         env:
           SHA_A: ${{ needs.build-aio-nextcloud.outputs.sha }}
           SHA_B: ${{ needs.build-all-in-one.outputs.sha }}
+          SHA_C: ${{ needs.build-aio-apache.outputs.sha }}
           BUILD_REF: ${{ inputs.build-ref }}
       - name: Emit the publish record
         run: |

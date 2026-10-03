@@ -11,10 +11,11 @@
 # That is why the matrix gates the announce, and why a tag is NEVER a raw digest: `image@sha256:...`
 # explodes into a bogus channel and every sibling resolves a tag that cannot exist.
 #
-# WHAT MOVES AND WHAT BUILDS. 18 of the 20 are registry-side retags — `buildx imagetools create`
+# WHAT MOVES AND WHAT BUILDS. 17 of the 20 are registry-side retags — `buildx imagetools create`
 # copies the manifest list at the registry itself (seconds, zero runner disk, the multi-arch entries
-# carried along byte-for-byte); aio-nextcloud (the apps+theme bake, patch 030) and all-in-one (the
-# reskin, patch 070) are real builds the workflow's build jobs own. At S1's landing both build from
+# carried along byte-for-byte); aio-nextcloud (the apps+theme bake, patch 030), aio-apache (the
+# installer's own certificate, patch 235) and all-in-one (the reskin, patch 070) are real builds the
+# workflow's build jobs own. At S1's landing the builds ran from
 # the mirror as-is — the patched content arrives when the replay chain (S4) passes build-ref aps/main.
 #
 # THE SEAM 010 SHARES. Patch 010 (containers.json's org swap) is GENERATED, never hand-edited: the
@@ -34,7 +35,7 @@
 # Usage:
 #   scripts/retag.sh list                         the sibling image names, one per line (parsed, in order)
 #   scripts/retag.sh sed FILE                     apply the org swap in place + verify (patch 010's generator)
-#   scripts/retag.sh retag TAG [--channel CH] [--force]      the 18-image registry-side walk
+#   scripts/retag.sh retag TAG [--channel CH] [--force]      the 17-image registry-side walk
 #   scripts/retag.sh matrix TAG [--channel CH]    the gate: all present + the retagged match ONE snapshot
 #   scripts/retag.sh manifest TAG                 the publish record, JSON on stdout
 #
@@ -46,7 +47,7 @@ set -uo pipefail
 ORG_UPSTREAM="nextcloud-releases"  # the upstream namespace the retag copies FROM
 ORG_FORK="aps-conecta"            # ours — 010's sed and this whole walk swap to exactly this
 GHCR="ghcr.io"
-BUILD_IMAGE="aio-nextcloud"        # the one sibling that is BUILT, not retagged (the bake; patch 030)
+BUILD_IMAGES=(aio-nextcloud aio-apache)  # the siblings that are BUILT, not retagged (patches 030 and 235)
 MASTER_IMAGE="all-in-one"         # the mastercontainer — not in containers.json; the operator's docker run names it
 DEFAULT_CHANNEL="latest"
 MIN_SIBLINGS="19"                 # shape-rot alarm (divergence's "expected 27+" precedent): a parse that
@@ -59,7 +60,7 @@ usage() {
 usage: scripts/retag.sh <command> [args]
   list                                  the sibling image names parsed from php/containers.json
   sed FILE                              apply the org swap in place + verify (patch 010's generator)
-  retag TAG [--channel CH] [--force]    the registry-side walk (every sibling except the baked one)
+  retag TAG [--channel CH] [--force]    the registry-side walk (every sibling except the built ones)
   matrix TAG [--channel CH]             the gate: all images present + the retagged match one snapshot
   manifest TAG                          the publish record, JSON on stdout
 EOF
@@ -95,6 +96,12 @@ siblings_load() { # fill SIBS once per run, floor-guarded — a shrunken parse m
   mapfile -t SIBS < <(list)
   [ "${#SIBS[@]}" -ge "$MIN_SIBLINGS" ] \
     || die "only ${#SIBS[@]} siblings parsed from $CONTAINERS — expected at least $MIN_SIBLINGS; a green walk over a shrunken set would be green without looking"
+  # A built image upstream renamed would be retagged unpatched under its new name, and ours orphaned
+  local b
+  for b in "${BUILD_IMAGES[@]}"; do
+    printf '%s\n' "${SIBS[@]}" | grep -qxF "$b" \
+      || die "built image '$b' is not a sibling in $CONTAINERS — upstream renamed or dropped it; fix BUILD_IMAGES and images.yml's build job"
+  done
 }
 
 tag_valid() { # TAG — a channel-valid Docker tag. ':' and '@' are excluded BY the charset itself; the
@@ -130,6 +137,8 @@ retag_one() { # FORK_REF UPSTREAM_REF — the registry-side copy, bounded (B-015
   timeout 300 docker buildx imagetools create -t "$1" "$2" 2>"$ERRF" \
     || { sed 's/^/       registry said: /' "$ERRF" >&2; return 1; }
 }
+
+is_built() { local b; for b in "${BUILD_IMAGES[@]}"; do [ "$1" = "$b" ] && return 0; done; return 1; }
 
 cmd_list() { list || die "cannot list the siblings"; }
 
@@ -184,8 +193,8 @@ cmd_retag() { # TAG [--channel CH] [--force] — the lockstep walk
   [ "$existing" = 0 ] || say "note: ${existing}/${total} images already carry '${tag}' — completing the set"
   local n=0
   for img in "${SIBS[@]}"; do
-    if [ "$img" = "$BUILD_IMAGE" ]; then
-      say "  skip $img — built by the workflow's build job (the bake, patch 030's slot), never retagged"
+    if is_built "$img"; then
+      say "  skip $img — built by the workflow's build jobs, never retagged"
       continue
     fi
     retag_one "$GHCR/$ORG_FORK/$img:$tag" "$GHCR/$ORG_UPSTREAM/$img:$channel" \
@@ -193,7 +202,7 @@ cmd_retag() { # TAG [--channel CH] [--force] — the lockstep walk
     say "  retagged $img"
     n=$((n+1))
   done
-  say "retag walk done: ${n} images now carry :${tag} (built separately: $BUILD_IMAGE, $MASTER_IMAGE)"
+  say "retag walk done: ${n} images now carry :${tag} (built separately: ${BUILD_IMAGES[*]}, $MASTER_IMAGE)"
 }
 
 cmd_matrix() { # TAG [--channel CH] — THE GATE. Existence is only half of it: a suite tag assembled
@@ -222,9 +231,7 @@ cmd_matrix() { # TAG [--channel CH] — THE GATE. Existence is only half of it: 
     fi
     present=$((present+1))
     printf '  %-26s %s\n' "$img" "$d"
-    case "$img" in
-      "$BUILD_IMAGE"|"$MASTER_IMAGE") continue ;;  # built images have no upstream counterpart to match
-    esac
+    if is_built "$img" || [ "$img" = "$MASTER_IMAGE" ]; then continue; fi  # no upstream counterpart to match
     if ! u="$(digest "$GHCR/$ORG_UPSTREAM/$img:$channel")"; then
       printf '  %-26s cannot prove the snapshot: upstream :%s unresolvable\n' "$img" "$channel"
       unprovable=$((unprovable+1))
@@ -243,8 +250,8 @@ cmd_matrix() { # TAG [--channel CH] — THE GATE. Existence is only half of it: 
     echo "  unprovable  = upstream could not be read; a matrix that cannot look is not a matrix" >&2
     exit 1
   fi
-  local retagged=$(( ${#SIBS[@]} - 1 ))
-  echo "MATRIX: PASS — ${present}/${total} images present; the ${retagged} retagged match upstream :${channel} (one snapshot); built: $BUILD_IMAGE + $MASTER_IMAGE from build-ref"
+  local retagged=$(( ${#SIBS[@]} - ${#BUILD_IMAGES[@]} ))
+  echo "MATRIX: PASS — ${present}/${total} images present; the ${retagged} retagged match upstream :${channel} (one snapshot); built: ${BUILD_IMAGES[*]} + $MASTER_IMAGE from build-ref"
   exit 0
 }
 

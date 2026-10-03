@@ -788,6 +788,97 @@ container_name_patterns() {  # 240: what matches containers by pattern follows t
 row 240 'what matches containers by pattern follows the new names — the six entrypoint host checks, the two schema patterns, the three log-route guards (the mastercontainer still allowed), both name lists in the test harness' \
   container_name_patterns
 
+# ── L4 S6: the install by IP over HTTPS (R22) ──────────────────────────────────────────────────
+
+# shellcheck disable=SC2016  # the PHP and spec lines are matched as bytes; $domain is theirs, not ours
+ip_when_skipped() {  # 233: an IP is a valid domain while domain validation is skipped — the suite's install
+  # by IP over HTTPS with the installer's own certificate (R22, declared PHP). With validation on an IP is
+  # still refused, and the suite asserts that in restore-instance; initial-setup skips validation, so its
+  # old IP-refusal step is gone.
+  local m="$TREE/php/src/Data/ConfigurationManager.php" t="$TREE/php/tests/tests" fail=0
+  s3_files "$m" "$t/initial-setup.spec.js" "$t/restore-instance.spec.js" || return 1
+  grep -A1 -F 'if(filter_var($domain, FILTER_VALIDATE_IP) && !$this->shouldDomainValidationBeSkipped($skipDomainValidation)) {' "$m" \
+    | grep -qF 'throw new InvalidSettingConfigurationException("Please enter a domain and not an IP-address!");' \
+    || { echo "  setDomain does not refuse an IP only while domain validation is on" >&2; fail=1; }
+  if grep -nF 'if(filter_var($domain, FILTER_VALIDATE_IP)) {' "$m"; then
+    echo "  setDomain still refuses every IP" >&2; fail=1
+  fi
+  if grep -nF "fill('1.1.1.1')" "$t/initial-setup.spec.js"; then
+    echo "  initial-setup.spec.js still expects an IP refused while it skips validation" >&2; fail=1
+  fi
+  grep -A2 -F "fill('1.1.1.1')" "$t/restore-instance.spec.js" \
+    | grep -qF "toContainText('Please enter a domain and not an IP-address!')" \
+    || { echo "  restore-instance.spec.js does not assert the IP refusal with validation on" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 233 'an IP is accepted as the domain only while domain validation is skipped — the install by IP over HTTPS (R22, declared PHP); with validation on it is refused, and the suite asserts that in restore-instance' \
+  ip_when_skipped
+
+# shellcheck disable=SC2016  # the shell, PHP and Caddyfile lines are matched as bytes
+installer_certificate() {  # 235: apache serves the installer's own certificate when one is mounted (R22).
+  # APS_TLS_DIR binds read-only at /aps-tls into apache alone (empty: no bind, as upstream; the
+  # mastercontainer refuses a relative path). start.sh writes the file certificate and default_sni — a
+  # client by IP sends no SNI — only on 443 with both files readable, else upstream's ACME stanza, whole.
+  # The routes sit in a snippet both site blocks import: a file-certificate site cannot share a block with
+  # the plain :23973 address. The tls placeholder is the site block's last line, after its import and
+  # before the file's closing brace; the default_sni one sits before the snippet (the global options).
+  # «auto_https» and «ADDITIONAL_TRUSTED_DOMAIN» stay on one line each: start.sh rewrites every line
+  # matching the first and deletes every line naming the second when it is empty.
+  local j="$TREE/php/containers.json" f="$TREE/php/src/ContainerDefinitionFetcher.php" \
+        m="$TREE/php/src/Data/ConfigurationManager.php" mc="$TREE/Containers/mastercontainer/start.sh" \
+        c="$TREE/Containers/apache/Caddyfile" s="$TREE/Containers/apache/start.sh" fail=0 nr ni nt ns
+  s3_files "$j" "$f" "$m" "$mc" "$c" "$s" || return 1
+  case "$(sed -n '/"container_name": "aps-conecta-apache"/,/"container_name": /p' "$j" | tr -d ' \n')" in
+    *'"source":"%APS_TLS_DIR%","destination":"/aps-tls","writeable":false'*) ;;
+    *) echo "  containers.json does not bind APS_TLS_DIR read-only at /aps-tls into apache" >&2; fail=1 ;;
+  esac
+  [ "$(grep -cF '"%APS_TLS_DIR%"' "$j")" -eq 1 ] || { echo "  APS_TLS_DIR is bound into another container too" >&2; fail=1; }
+  grep -A1 -F "} elseif (\$value['source'] === '%APS_TLS_DIR%') {" "$f" | grep -qF '$this->configurationManager->apsTlsDir;' \
+    || { echo "  ContainerDefinitionFetcher does not resolve %APS_TLS_DIR%" >&2; fail=1; }
+  grep -qF "get => \$this->getEnvironmentalVariableOrConfig('APS_TLS_DIR', 'aps_tls_dir', '');" "$m" \
+    || { echo "  ConfigurationManager does not read APS_TLS_DIR" >&2; fail=1; }
+  grep -qF 'if [ -n "$APS_TLS_DIR" ]; then' "$mc" || { echo "  the mastercontainer does not check APS_TLS_DIR" >&2; fail=1; }
+  nr="$(grep -nxF '(aps_routes) {' "$c" | cut -d: -f1)"
+  ni="$(grep -nxF '    import aps_routes' "$c" | tail -1 | cut -d: -f1)"
+  nt="$(grep -nxF '    # tls placeholder' "$c" | cut -d: -f1)"
+  ns="$(grep -nxF '    # default_sni placeholder' "$c" | cut -d: -f1)"
+  { [ "$(grep -cxF '    import aps_routes' "$c")" -eq 2 ] && [ -n "$nr" ]; } \
+    || { echo "  the Caddyfile's routes are not one snippet imported by both blocks" >&2; fail=1; }
+  { [ -n "$nt" ] && [ -n "$ni" ] && [ "$nt" -gt "$ni" ] && [ "$nt" -eq "$(( $(wc -l < "$c") - 1 ))" ] \
+      && [ "$(tail -n 1 "$c")" = '}' ]; } \
+    || { echo "  the Caddyfile's tls placeholder is missing or outside the site block" >&2; fail=1; }
+  { [ -n "$ns" ] && [ -n "$nr" ] && [ "$ns" -lt "$nr" ]; } \
+    || { echo "  the Caddyfile's default_sni placeholder is missing or outside the global options" >&2; fail=1; }
+  [ "$(grep -c 'auto_https' "$c")" -eq 1 ] || { echo "  a second Caddyfile line names auto_https — start.sh would rewrite it" >&2; fail=1; }
+  [ "$(grep -c 'ADDITIONAL_TRUSTED_DOMAIN' "$c")" -eq 1 ] \
+    || { echo "  a second Caddyfile line names ADDITIONAL_TRUSTED_DOMAIN — start.sh would delete it" >&2; fail=1; }
+  if grep -nF 'issuer acme' "$c"; then echo "  the Caddyfile still hard-codes the ACME issuer" >&2; fail=1; fi
+  { grep -qF "if [ \"\$APACHE_PORT\" = '443' ] && [ -r /aps-tls/tls.crt ] && [ -r /aps-tls/tls.key ]; then" "$s" \
+      && grep -qF "TLS_STANZA='tls /aps-tls/tls.crt /aps-tls/tls.key'" "$s" \
+      && grep -qF 'DEFAULT_SNI="default_sni $NC_DOMAIN"' "$s" \
+      && grep -qF "TLS_STANZA='tls {\n\t\tissuer acme {\n\t\t\tprofile shortlived\n\t\t\tdisable_http_challenge\n\t\t}\n\t}'" "$s" \
+      && grep -qxF "    DEFAULT_SNI=''" "$s" \
+      && grep -qF -e '-e "s|# tls placeholder|$TLS_STANZA|" -e "s|# default_sni placeholder|$DEFAULT_SNI|"' "$s"; } \
+    || { echo "  apache's start.sh does not choose the certificate (the file on 443 with both files, else upstream's ACME stanza)" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 235 "apache serves the installer's own certificate when one is mounted — APS_TLS_DIR bound read-only into apache alone, the file certificate and default_sni on 443 with both files, else upstream's ACME stanza; the routes one snippet (R22, declared PHP: the setting and its bind)" \
+  installer_certificate
+
+harness_reset_eurooffice() {  # 237: the suite harness's reset removes Euro-Office too. It is always on
+  # (patch 200): a running one survived the reset and locked the next fresh wizard's options (S5).
+  local run="$TREE/php/tests/run.sh"
+  s3_files "$run" || return 1
+  { grep -F 'docker container rm --force' "$run" | grep -qF ',collabora,eurooffice,borgbackup}' \
+      && grep -F 'docker volume rm' "$run" | grep -qF ',elasticsearch,eurooffice,eurooffice_data}'; } \
+    || { echo "  run.sh's reset does not remove the Euro-Office container and its two volumes" >&2; return 1; }
+}
+
+row 237 "the suite harness's reset removes the Euro-Office container and its two volumes — always on, a running one locked the next wizard's options" \
+  harness_reset_eurooffice
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1

@@ -249,4 +249,4 @@ jobs:
       force: ${{ inputs.force }}
     permissions:
       contents: read
-      packages: write   # headroom for the Images pipeline's three pushing jobs
+      packages: write   # headroom for the Images pipeline's four pushing jobs
