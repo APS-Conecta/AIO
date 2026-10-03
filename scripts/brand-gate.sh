@@ -590,7 +590,7 @@ help_links_ours() {  # 140: every help link the wizard renders goes to the suite
   # (the positive control).
   local t="$TREE/php/templates" fail=0 a
   s3_files "$t/components/container-state.twig" "$t/includes/backup-dirs.twig" || return 1
-  if grep -rnIE 'github\.com/(nextcloud|nextcloud-releases|cloud-py-api)/|([a-z0-9-]+\.)*nextcloud\.com' "$t" "$TREE/php/public"; then
+  if grep -rnIE 'github\.com/(nextcloud|nextcloud-releases|cloud-py-api)/|([a-z0-9-]+\.)*nextcloud\.(com|org)|nextcloud\.github\.io' "$t" "$TREE/php/public"; then
     echo "  an upstream URL survives on a wizard surface" >&2; fail=1
   fi
   if grep -n 'c.documentation' "$t/components/container-state.twig"; then
@@ -637,9 +637,11 @@ page_choices() {  # 160: the page offers only what the suite ships (R25, its tem
   # baked Nextcloud Hub (no newer-major checkbox, no upgrade note), the suite's version — its
   # image tag — in the heading instead of upstream AIO's, the office card named for what it is
   # with no comparison against the removed cards, the deprecated docker socket proxy and HaRP
-  # hidden, and no «mastercontainer» jargon in the prose (the asistente, as gestion's docs call
-  # it; ids and commands keep the container's real name). The server-side refusals are S4's.
-  local c="$TREE/php/templates/containers.twig" o="$TREE/php/templates/includes/optional-containers.twig" fail=0 id
+  # hidden while off (an instance that has one on still sees it, so it can be unchecked — a
+  # hidden checked box would re-save itself forever), and no «mastercontainer» jargon in any
+  # template's or script's prose (the asistente, as gestion's docs call it; ids and commands
+  # keep the container's real name). The server-side refusals are S4's.
+  local c="$TREE/php/templates/containers.twig" o="$TREE/php/templates/includes/optional-containers.twig" fail=0 id v
   s3_files "$c" "$o" "$TREE/php/public/forms.js" || return 1
   grep -qF "{% set newMajorVersionString = '' %}" "$c" || { echo "  the Hub major-version choice is still offered" >&2; fail=1; }
   grep -qF '<h1>APS Conecta Gestión AIO {{ current_channel }}</h1>' "$c" || { echo "  the heading does not show the suite version" >&2; fail=1; }
@@ -648,16 +650,18 @@ page_choices() {  # 160: the page offers only what the suite ships (R25, its tem
   if grep -nE 'Nextcloud Office|Mejor rendimiento|Compatibilidad ODF limitada|Mejor compatibilidad con Microsoft' "$o"; then
     echo "  the office card still names or compares against upstream's suites" >&2; fail=1
   fi
-  for id in docker-socket-proxy harp; do
-    tr -d '\n' < "$o" | grep -qE "<p hidden> *<input +type=\"checkbox\" +id=\"$id\"" || { echo "  the $id option is visible" >&2; fail=1; }
+  for id in docker-socket-proxy:docker_socket_proxy harp:harp; do
+    v="${id#*:}"; id="${id%%:*}"
+    tr -d '\n' < "$o" | grep -qE "<p\{% if is_${v}_enabled != true %\} hidden\{% endif %\}> *<input +type=\"checkbox\" +id=\"$id\"" \
+      || { echo "  the $id option is not hidden-while-off" >&2; fail=1; }
   done
-  if grep -nE '(^|[^-_[:alnum:]])mastercontainer([^-_[:alnum:]]|$)' "$c" "$TREE/php/public/forms.js" | grep -v '{#'; then
+  if grep -rnE '(^|[^-_[:alnum:]])mastercontainer([^-_[:alnum:]]|$)' "$TREE/php/templates" "$TREE/php/public"/*.js | grep -v '{#'; then
     echo "  «mastercontainer» jargon survives in the wizard's prose" >&2; fail=1
   fi
   [ "$fail" -eq 0 ]
 }
 
-row 160 "the page offers only what the suite ships — no Hub major-version choice, the suite version in the heading, the office card titled Oficina, the docker socket proxy and HaRP hidden, no mastercontainer jargon (R25, its template part)" \
+row 160 "the page offers only what the suite ships — no Hub major-version choice, the suite version in the heading, the office card titled Oficina, the docker socket proxy and HaRP hidden while off, no mastercontainer jargon (R25, its template part)" \
   page_choices
 
 post_start_page() {  # 170: after start the page says only true, APS things (R27): the suite's
@@ -667,7 +671,7 @@ post_start_page() {  # 170: after start the page says only true, APS things (R27
   # credentials, the open button, the container list and the page's prose — with the translated
   # suite asserting the bytes it clicks. «Nextcloud» stays only where the page hides it: the
   # Hub-upgrade block (160 empties its switch), the docker socket proxy and HaRP options and the
-  # JS alert behind them (160 hides them), and the community-containers section (S4's).
+  # JS alert behind them (160 hides them while off), and the community-containers section (S4's).
   local c="$TREE/php/templates/containers.twig" j="$TREE/php/containers.json" s="$TREE/php/tests/tests" fail=0 want
   s3_files "$c" "$j" "$s/initial-setup.spec.js" "$s/restore-instance.spec.js" || return 1
   while IFS= read -r want; do
@@ -683,17 +687,18 @@ EOF
     echo "  a false or stale statement survives on the post-start page" >&2; fail=1
   fi
   if grep -rn 'Nextcloud' "$TREE/php/templates" "$TREE/php/public"/*.js \
-      | grep -v -e '{#' -e 'Nextcloud Hub' -e 'Nextcloud App API' -e 'ExApps de Nextcloud' -e '/includes/community-containers.twig:'; then
+      | grep -v -e '{#' -e '/includes/community-containers.twig:' \
+      | sed -e 's/Nextcloud Hub//g' -e 's/Nextcloud App API//g' -e 's/ExApps de Nextcloud//g' | grep 'Nextcloud'; then
     echo "  «Nextcloud» survives in the wizard's prose" >&2; fail=1
   fi
   if grep -rn 'api/docker/prune' "$TREE/php/templates"; then echo "  the docker prune button is still offered" >&2; fail=1; fi
   grep -qF "name: 'Abrir APS Conecta Gestión ↗'" "$s/initial-setup.spec.js" || { echo "  initial-setup.spec.js clicks a button the page no longer has" >&2; fail=1; }
   grep -qF "name: 'Abrir APS Conecta Gestión ↗'" "$s/restore-instance.spec.js" || { echo "  restore-instance.spec.js clicks a button the page no longer has" >&2; fail=1; }
   grep -qF "Contraseña inicial de APS Conecta Gestión:" "$s/initial-setup.spec.js" || { echo "  initial-setup.spec.js waits for a label the page no longer has" >&2; fail=1; }
-  for want in 'Servidor de aplicaciones' Talk 'Grabador de Talk' Euro-Office Whiteboard; do
+  for want in 'Servidor de aplicaciones' Talk 'Grabador de Talk' Euro-Office Whiteboard Collabora; do
     grep -qF "\"display_name\": \"$want\"" "$j" || { echo "  containers.json lacks the display name $want" >&2; fail=1; }
   done
-  if grep -nE '"display_name": "(Nextcloud|EuroOffice|Nextcloud Talk|Nextcloud Talk Recording|Nextcloud Whiteboard)"' "$j"; then
+  if grep -nE '"display_name": "(Nextcloud|EuroOffice|Nextcloud Talk|Nextcloud Talk Recording|Nextcloud Whiteboard|Nextcloud Office)"' "$j"; then
     echo "  an upstream container name survives in the list" >&2; fail=1
   fi
   [ "$fail" -eq 0 ]
@@ -711,8 +716,8 @@ phone_layout() {  # 180: the wizard fits a 360px phone. layout.twig declares the
   grep -qF '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>' "$t/layout.twig" \
     || { echo "  layout.twig declares no viewport" >&2; fail=1; }
   if grep -n '<head>' "$t/containers.twig"; then echo "  containers.twig still carries a <head> stub in its body" >&2; fail=1; fi
-  block="$(sed -n '/^@media only screen and (max-width: 640px) {/,/^}/p' "$css")"
-  case "$block" in *".login {"*"position: static;"*"transform: none;"*"width: auto;"*) ;;
+  block="$(sed -n '/^@media only screen and (max-width: 640px) {/,/^}/p' "$css" | sed -n '/^    \.login {/,/^    }/p')"
+  case "$block" in *"position: static;"*"transform: none;"*"width: auto;"*) ;;
     *) echo "  style.css has no 640px rule letting the login card flow" >&2; fail=1 ;; esac
   grep -qF 'href="style.css?v16"' "$t/layout.twig" || { echo "  layout.twig still links the old stylesheet key" >&2; fail=1; }
   grep -qF 'href="style.css?v16"' "$t/log.twig" || { echo "  log.twig still links the old stylesheet key" >&2; fail=1; }

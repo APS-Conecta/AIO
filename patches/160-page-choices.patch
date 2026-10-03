@@ -12,7 +12,7 @@ index 94f1d9e5..47f325e4 100644
        setTimeout(function(){
          window.location.reload(true);
 diff --git a/php/templates/containers.twig b/php/templates/containers.twig
-index 3f441e81..22892ff6 100644
+index 9ed438f8..de5d0184 100644
 --- a/php/templates/containers.twig
 +++ b/php/templates/containers.twig
 @@ -17,8 +17,7 @@
@@ -111,7 +111,7 @@ index 3f441e81..22892ff6 100644
                                  <form method="POST" action="api/configuration" class="xhr">
                                      <input type="text" id="timezone" name="timezone" value="America/Santiago" />
 diff --git a/php/templates/includes/optional-containers.twig b/php/templates/includes/optional-containers.twig
-index 9dc42ef6..7d12aded 100644
+index 9dc42ef6..c8810d20 100644
 --- a/php/templates/includes/optional-containers.twig
 +++ b/php/templates/includes/optional-containers.twig
 @@ -27,7 +27,7 @@
@@ -150,7 +150,7 @@ index 9dc42ef6..7d12aded 100644
      </p>
  
 -    <p>
-+    <p hidden>
++    <p{% if is_docker_socket_proxy_enabled != true %} hidden{% endif %}>
          <input
              type="checkbox"
              id="docker-socket-proxy"
@@ -159,7 +159,7 @@ index 9dc42ef6..7d12aded 100644
          <label for="docker-socket-proxy">Docker Socket Proxy (necesario para la Nextcloud App API) ⚠️ El contenedor docker socket proxy está obsoleto. ¡Utilice HaRP (proxy inverso de alta disponibilidad para ExApps de Nextcloud) en su lugar.</label>
      </p>
 -    <p>
-+    <p hidden>
++    <p{% if is_harp_enabled != true %} hidden{% endif %}>
          <input
              type="checkbox"
              id="harp"

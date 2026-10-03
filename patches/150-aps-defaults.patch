@@ -1,5 +1,5 @@
 diff --git a/php/templates/containers.twig b/php/templates/containers.twig
-index 75d1648e..3f441e81 100644
+index 75d1648e..9ed438f8 100644
 --- a/php/templates/containers.twig
 +++ b/php/templates/containers.twig
 @@ -103,7 +103,7 @@
@@ -64,7 +64,7 @@ index 75d1648e..3f441e81 100644
                                      <input type="submit" value="Enviar zona horaria" data-confirm='¿Está seguro de que esta es una zona horaria válida? Verifíquela siguiendo el artículo de Wikipedia y comprobando la columna correcta. Si la zona horaria no es válida, romperá el inicio, ya que la base de datos no se inicializará correctamente y terminará en un bucle de inicio.' />
                                  </form>
 -                                <p>Debe asegurarse de que la zona horaria que ingrese sea válida. Un ejemplo es <strong>Europe/Berlin</strong>. Puede obtener valores válidos consultando la columna 'TZ identifier' de esta lista: <a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List"><strong>haga clic aquí</strong></a>. El valor predeterminado es <strong>Etc/UTC</strong> si no se ingresa nada.</p>
-+                                <p>Debe asegurarse de que la zona horaria que ingrese sea válida. Para Chile continental es <strong>America/Santiago</strong>. Puede obtener valores válidos consultando la columna 'TZ identifier' de esta lista: <a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List"><strong>haga clic aquí</strong></a>. Si se deja vacío, queda <strong>Etc/UTC</strong>.</p>
++                                <p>Debe asegurarse de que la zona horaria que ingrese sea válida. Para Chile continental es <strong>America/Santiago</strong>; en Magallanes, <strong>America/Punta_Arenas</strong>, y en Isla de Pascua, <strong>Pacific/Easter</strong>. Puede obtener valores válidos consultando la columna 'TZ identifier' de esta lista: <a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List"><strong>haga clic aquí</strong></a>. Si se deja vacío, queda <strong>Etc/UTC</strong>.</p>
                              {% else %}
                                  <p>La zona horaria de Nextcloud está configurada actualmente en <strong>{{ timezone }}</strong>. Puede cambiarla haciendo clic en el botón siguiente.</p>
                                  <form method="POST" action="api/configuration" class="xhr">

@@ -60,9 +60,9 @@ The translated Playwright suite (`php/tests`, patch 090) keeps English assertion
 these as its own canary that the sweep never bled into PHP.
 
 **Nominative use.** The wizard names itself «APS Conecta Gestión AIO»; translated prose calls the
-software inside it «la suite» — «Nextcloud» remains only on the surfaces the page hides (the
-Hub-upgrade block, the docker socket proxy and HaRP options, the community-containers section)
-and in the PHP-borne messages listed above — and the
+software inside it «la suite» — «Nextcloud» remains only in the Hub-upgrade block the page never
+renders, the docker socket proxy and HaRP options (shown only where one is already on), the
+community-containers section and the PHP-borne messages listed above — and the
 wizard's help links point at the suite's own docs — gestion's `docs/INSTALLER.md` and
 `docs/GUIA-CLINICA.md`. The image labels are byte-identical upstream,
 deliberately, and both readings are recorded: `org.opencontainers.image.vendor` says

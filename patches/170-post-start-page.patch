@@ -1,5 +1,5 @@
 diff --git a/php/containers.json b/php/containers.json
-index 72f9b824..7e206390 100644
+index 72f9b824..02370c81 100644
 --- a/php/containers.json
 +++ b/php/containers.json
 @@ -154,7 +154,7 @@
@@ -9,6 +9,15 @@ index 72f9b824..7e206390 100644
 -      "display_name": "Nextcloud",
 +      "display_name": "Servidor de aplicaciones",
        "image": "ghcr.io/aps-conecta/aio-nextcloud",
+       "init": true,
+       "healthcheck": {
+@@ -375,7 +375,7 @@
+       "container_name": "nextcloud-aio-collabora",
+       "image_tag": "%AIO_CHANNEL%",
+       "documentation": "https://github.com/nextcloud/all-in-one/discussions/1358",
+-      "display_name": "Nextcloud Office",
++      "display_name": "Collabora",
+       "image": "ghcr.io/aps-conecta/aio-collabora",
        "init": true,
        "healthcheck": {
 @@ -425,7 +425,7 @@
@@ -48,7 +57,7 @@ index 72f9b824..7e206390 100644
        "user": "65534",
        "init": true,
 diff --git a/php/templates/containers.twig b/php/templates/containers.twig
-index 22892ff6..16877943 100644
+index de5d0184..454f4f38 100644
 --- a/php/templates/containers.twig
 +++ b/php/templates/containers.twig
 @@ -66,7 +66,7 @@
@@ -194,7 +203,7 @@ index 22892ff6..16877943 100644
                                      <input type="hidden" name="{{csrf.keys.name}}" value="{{csrf.name}}">
 @@ -619,7 +598,7 @@
                                  </form>
-                                 <p>Debe asegurarse de que la zona horaria que ingrese sea válida. Para Chile continental es <strong>America/Santiago</strong>. Puede obtener valores válidos consultando la columna 'TZ identifier' de esta lista: <a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List"><strong>haga clic aquí</strong></a>. Si se deja vacío, queda <strong>Etc/UTC</strong>.</p>
+                                 <p>Debe asegurarse de que la zona horaria que ingrese sea válida. Para Chile continental es <strong>America/Santiago</strong>; en Magallanes, <strong>America/Punta_Arenas</strong>, y en Isla de Pascua, <strong>Pacific/Easter</strong>. Puede obtener valores válidos consultando la columna 'TZ identifier' de esta lista: <a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List"><strong>haga clic aquí</strong></a>. Si se deja vacío, queda <strong>Etc/UTC</strong>.</p>
                              {% else %}
 -                                <p>La zona horaria de Nextcloud está configurada actualmente en <strong>{{ timezone }}</strong>. Puede cambiarla haciendo clic en el botón siguiente.</p>
 +                                <p>La zona horaria de la suite está configurada actualmente en <strong>{{ timezone }}</strong>. Puede cambiarla haciendo clic en el botón siguiente.</p>
@@ -238,7 +247,7 @@ index 25283fcd..aa8702db 100644
      <p>
          {% if is_dri_device_enabled == true and is_nvidia_gpu_enabled == true %}
 diff --git a/php/templates/includes/optional-containers.twig b/php/templates/includes/optional-containers.twig
-index 7d12aded..f50d0ae2 100644
+index c8810d20..77401064 100644
 --- a/php/templates/includes/optional-containers.twig
 +++ b/php/templates/includes/optional-containers.twig
 @@ -80,7 +80,7 @@
@@ -276,7 +285,7 @@ index 7d12aded..f50d0ae2 100644
 +        <label for="talk-recording">Servidor de grabación de Talk (requiere que Talk esté activado, ~1 GB de RAM adicional y ~2 vCPU adicionales)</label>
      </p>
  
-     <p hidden>
+     <p{% if is_docker_socket_proxy_enabled != true %} hidden{% endif %}>
 @@ -188,7 +188,7 @@
      </p>
      <input class="options-form-submit" type="submit" value="Guardar cambios" />
