@@ -726,6 +726,68 @@ phone_layout() {  # 180: the wizard fits a 360px phone. layout.twig declares the
 row 180 "the wizard fits a 360px phone — the viewport declared, the login card flowing under 640px, the stylesheet's cache key bumped" \
   phone_layout
 
+# ── L4 S5: the container names (D9) ──────────────────────────────────────────────────────────
+
+container_names() {  # 240: the suite's 19 containers are aps-conecta-*, and no swept file names one the old
+  # way. The keep-list is the generator's, restated here on purpose: a gate that imported it would agree
+  # with any mistake in it.
+  local j="$TREE/php/containers.json" fail=0 n left x
+  [ -f "$j" ] || { echo "  no such file: $j" >&2; return 1; }
+  if grep -nF '"container_name": "nextcloud-aio-' "$j"; then
+    echo "  containers.json still names a container nextcloud-aio-*" >&2; fail=1
+  fi
+  n="$(grep -cF '"container_name": "aps-conecta-' "$j")"
+  [ "$n" -ge 19 ] || { echo "  only $n aps-conecta container names in containers.json (floor 19)" >&2; fail=1; }
+  for x in php/src php/public php/templates php/tests Containers community-containers; do
+    [ -d "$TREE/$x" ] || { echo "  no such directory: $TREE/$x — the sweep would pass over nothing" >&2; return 1; }
+  done
+  # [a-z0-9-]*: a bare prefix (a filter or a str_starts_with on «nextcloud-aio-») is a miss too
+  left="$(cd "$TREE" && grep -rhoE --exclude='*.md' 'nextcloud-aio-[a-z0-9-]*' php/containers.json php/src php/public \
+            php/templates php/tests Containers community-containers \
+          | sort -u | grep -vxE 'nextcloud-aio-(mastercontainer|mastercontainer-tests|test|rundeps|makemkv)')"
+  [ -z "$left" ] || { echo "  old names left in the swept files: $(echo "$left" | tr '\n' ' ')" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 240 'the suite containers are named aps-conecta-* — the 19 in containers.json and every reference in php/, Containers/ and the community JSONs; only the kept names stay nextcloud-aio-* (the mastercontainer, the test project, the apk virtual package, the npm name, the dead makemkv check)' \
+  container_names
+
+# shellcheck disable=SC2016  # the PHP and JS lines are matched as bytes; $id is their text, not ours
+container_name_patterns() {  # 240: what matches containers by pattern follows the new names — the
+  # entrypoint's office and Talk detection (a miss reads the suite's own host as external), the schema the
+  # validator holds every JSON to, and the log route's three guards, which still let the wizard's own log in
+  local e="$TREE/Containers/nextcloud/entrypoint.sh" sch="$TREE/php/containers-schema.json" fail=0 x
+  local run="$TREE/php/tests/run.sh"
+  for x in "$e" "$sch" "$TREE/php/public/index.php" "$TREE/php/public/log-load.js" \
+           "$TREE/php/src/Controller/DockerController.php" "$run"; do
+    [ -f "$x" ] || { echo "  no such file: $x — re-point this row" >&2; return 1; }
+  done
+  if grep -nF 'grep -q "nextcloud-.*-' "$e"; then
+    echo "  the entrypoint still detects the suite's hosts by the old pattern" >&2; fail=1
+  fi
+  for x in collabora:1 onlyoffice:2 eurooffice:2 talk:1; do
+    [ "$(grep -cF "grep -q \"aps-conecta-${x%%:*}\"" "$e")" -eq "${x#*:}" ] \
+      || { echo "  the entrypoint does not detect aps-conecta-${x%%:*} ${x#*:} time(s)" >&2; fail=1; }
+  done
+  grep -qF '"pattern": "^aps-conecta-[a-z0-9-]+$"' "$sch" \
+    || { echo "  the schema does not require aps-conecta container names" >&2; fail=1; }
+  grep -qF '"pattern": "^aps-conecta-[a-z-]+$"' "$sch" \
+    || { echo "  the schema does not require aps-conecta dependencies" >&2; fail=1; }
+  grep -qF "if (!str_starts_with(\$id, 'aps-conecta-') && \$id !== 'nextcloud-aio-mastercontainer') {" "$TREE/php/public/index.php" \
+    || { echo "  index.php's log route does not take aps-conecta-* and the mastercontainer" >&2; fail=1; }
+  grep -qF "!(id.startsWith('aps-conecta-') || id === 'nextcloud-aio-mastercontainer')" "$TREE/php/public/log-load.js" \
+    || { echo "  log-load.js does not take aps-conecta-* and the mastercontainer" >&2; fail=1; }
+  grep -qF "if (str_starts_with(\$id, 'aps-conecta-') || \$id === 'nextcloud-aio-mastercontainer') {" "$TREE/php/src/Controller/DockerController.php" \
+    || { echo "  DockerController's log route does not take aps-conecta-* and the mastercontainer" >&2; fail=1; }
+  { grep -qF 'nextcloud-aio-mastercontainer aps-conecta-{apache,' "$run" \
+      && grep -qF 'for container in nextcloud-aio-mastercontainer aps-conecta-borgbackup; do' "$run"; } \
+    || { echo "  the test harness's name lists (run.sh) do not name aps-conecta-* and the mastercontainer" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 240 'what matches containers by pattern follows the new names — the six entrypoint host checks, the two schema patterns, the three log-route guards (the mastercontainer still allowed), both name lists in the test harness' \
+  container_name_patterns
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1

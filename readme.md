@@ -38,12 +38,13 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 210 | Talk, Whiteboard and Imaginary start off (PHP defaults, declared) |
 | 220 | a fresh install calls nothing it does not need — whiteboard's npm update check, the announcements feed |
 | 230 | the fresh install skips circles' legacy-table probe (no «oc_circle_circles» error) |
+| 240 | the suite's containers are named `aps-conecta-*` (generated; the wizard stays `nextcloud-aio-mastercontainer`; fresh installs only) |
 
 **PHP logic changes only where declared.** Every other modification is a string, an asset, a
 template, or Dockerfile plumbing, carried as a patch the CI replays and the gates verify. The
 declared PHP changes: patch 080's three registry references (strings), patch 200's office guard
-(any office other than Euro-Office is refused), and patch 210's defaults (Talk, Whiteboard and
-Imaginary start off).
+(any office other than Euro-Office is refused), patch 210's defaults (Talk, Whiteboard and
+Imaginary start off), and patch 240's container names (strings, and the log route's name guard).
 
 **What the operator sees.** The wizard presents itself as «APS Conecta Gestión AIO — Instalador»;
 an already-installed instance greets with «APS Conecta Gestión AIO ya está instalado»; once the
