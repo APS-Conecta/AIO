@@ -101,7 +101,7 @@ php/templates/includes/aio-config.twig|Click here to view the current AIO config
 php/templates/includes/backup-dirs.twig|An example for Linux is|Un ejemplo para Linux es
 php/templates/components/container-state.twig|>Stopped</a>|>Detenido</a>
 php/templates/setup.twig|All-in-One setup|Anote la frase de contraseña
-php/templates/login.twig|Nextcloud AIO Login|Inicie sesión con su frase de contraseña de Nextcloud AIO
+php/templates/login.twig|Nextcloud AIO Login|Inicie sesión con su frase de contraseña de
 php/templates/already-installed.twig|is already installed|ya está instalado
 php/templates/log.twig|>Disable</button>|>Desactivar</button>
 php/templates/layout.twig|<html lang="en">|<html lang="es">
@@ -265,6 +265,9 @@ reskin_identity() {  # MODE — walk 070's identity table (the <title>/h1/h2 loc
   # header's "the <title>/h1 swap is the reskin's, not the sweep's". Nominative body copy
   # ("su Nextcloud", the doc links) is deliberately NOT this row's scope: that is slice 23's
   # fork-declaration audit surface, not the identity swap's.
+  # AMENDED WITH L4 S2: 130 renames the product to «APS Conecta Gestión AIO», so the present
+  # arm checks the «APS Conecta» prefix both names share — 070's own claim — and row 130
+  # owns the full name. A sentinel a later patch rewrites is a row that reds forever.
   local mode="$1" f old new fail=0
   while IFS='|' read -r f old new; do
     [ -f "$TREE/$f" ] || { echo "reskin_identity: no such file: $f" >&2; return 1; }
@@ -277,12 +280,12 @@ reskin_identity() {  # MODE — walk 070's identity table (the <title>/h1/h2 loc
       grep -qF "$new" "$TREE/$f" || { echo "  no APS identity in $f — the rename is missing" >&2; fail=1; }
     fi
   done <<'EOF'
-php/templates/layout.twig|<title>AIO</title>|<title>APS Conecta AIO — Instalador</title>
-php/templates/log.twig|<title>AIO</title>|<title>APS Conecta AIO — Instalador</title>
-php/templates/containers.twig|<h1>Nextcloud AIO v|<h1>APS Conecta AIO v
-php/templates/login.twig|Inicio de sesión de Nextcloud AIO|Inicio de sesión de APS Conecta AIO
-php/templates/already-installed.twig|Nextcloud All-In-One ya está instalado|APS Conecta AIO ya está instalado
-php/templates/setup.twig|Configuración de All-in-One|Configuración de APS Conecta AIO
+php/templates/layout.twig|<title>AIO</title>|<title>APS Conecta
+php/templates/log.twig|<title>AIO</title>|<title>APS Conecta
+php/templates/containers.twig|<h1>Nextcloud AIO v|<h1>APS Conecta
+php/templates/login.twig|Inicio de sesión de Nextcloud AIO|Inicio de sesión de APS Conecta
+php/templates/already-installed.twig|Nextcloud All-In-One ya está instalado|<h2>APS Conecta
+php/templates/setup.twig|Configuración de All-in-One|Configuración de APS Conecta
 EOF
   [ "$fail" -eq 0 ]
 }
@@ -374,10 +377,10 @@ territorio_pending_card() {  # the S12 gate's operator contract, made mechanical
 }
 
 
-row 070 "the identity lockups name APS Conecta AIO — titles, h1s and the already-installed h2 carry zero upstream product names (the <title>/h1 swap is the reskin's, not the sweep's)" \
+row 070 "the identity lockups name APS Conecta — titles, h1s and the already-installed h2 carry zero upstream product names (the <title>/h1 swap is the reskin's, not the sweep's)" \
   reskin_identity absent
 
-row 070 "the identity swap landed — the APS Conecta AIO product name present on every identity surface" \
+row 070 "the identity swap landed — the APS Conecta name present on every identity surface (130 owns the full product name)" \
   reskin_identity present
 
 row 070 "the dark toggle is gone — button, script, CSS rules and every [data-theme=\"dark\"] block, with the one-shot localStorage clear in apply-theme.js fixing all load surfaces at once" \
@@ -418,7 +421,7 @@ suite_escl_present() {  # TREE — the translated suite's positive control: one 
     [ -f "$t/$f" ] || { echo "suite_escl_present: no such file: $f" >&2; return 1; }
     grep -qF "$s" "$t/$f" || { echo "  no es-CL sentinel in $f: $s" >&2; fail=1; }
   done <<'EOF'
-php/tests/tests/helpers.js|Abrir el inicio de sesión de Nextcloud AIO ↗
+php/tests/tests/helpers.js|Abrir el inicio de sesión de
 php/tests/tests/initial-setup.spec.js|Enviar dominio
 php/tests/tests/initial-setup.spec.js|Contraseña inicial de Nextcloud:
 php/tests/tests/restore-instance.spec.js|¡El último restore fue exitoso!
@@ -497,9 +500,9 @@ readme_twig_equal() {  # the fork declaration (main's readme.md) quotes the wiza
     grep -qF "$q" "$TREE/$f" \
       || { echo "  $f does not carry the declared string: $q" >&2; fail=1; }
   done <<'EOF'
-APS Conecta AIO — Instalador|php/templates/layout.twig
-APS Conecta AIO — Instalador|php/templates/log.twig
-APS Conecta AIO ya está instalado|php/templates/already-installed.twig
+APS Conecta Gestión AIO — Instalador|php/templates/layout.twig
+APS Conecta Gestión AIO — Instalador|php/templates/log.twig
+APS Conecta Gestión AIO ya está instalado|php/templates/already-installed.twig
 pendiente de empaquetado|php/templates/containers.twig
 Please enter a domain and not an IP-address!|php/src/Data/ConfigurationManager.php
 The entered timezone does not seem to be a valid timezone!|php/src/Data/ConfigurationManager.php
@@ -509,6 +512,78 @@ EOF
 
 row 070 "the fork declaration quotes the wizard's shipped bytes — every declared string byte-exists in the replayed tree and in main's readme (the S11 drift gate: docs assert what exists)" \
   readme_twig_equal
+
+# ── L4 S2: the identity (R21 fonts, R20 lockup, R19 product name) ─────────────────────────────
+
+csp_fonts_self() {  # 110: the wizard's CSP lets its own brand fonts load. Matched on the real
+  # header line: the comment block above it names every directive in prose, so a file-wide grep
+  # would pass on a comment. default-src stays 'none'; no font source wider than the origin.
+  local f="$TREE/Containers/mastercontainer/headers.Caddyfile" line
+  line="$(grep -E '^[[:space:]]*Content-Security-Policy ' "$f")" \
+    || { echo "  no Content-Security-Policy line in headers.Caddyfile" >&2; return 1; }
+  case "$line" in *"default-src 'none';"*) ;; *) echo "  the CSP lost default-src 'none'" >&2; return 1 ;; esac
+  case "$line" in *"font-src 'self';"*) ;; *) echo "  the CSP blocks the wizard's own fonts (no font-src 'self')" >&2; return 1 ;; esac
+  if printf '%s\n' "$line" | grep -qE "font-src[^;]*([*]|data:|https?:)"; then
+    echo "  font-src reaches beyond the wizard's own origin" >&2; return 1
+  fi
+}
+
+lockup_outlines() {  # 120: the banner lockup's wordmark is outlines. A <use> clone cannot carry fonts
+  # embedded in logo.svg, so live text fell back to whatever the page loaded (R20); outlines need
+  # no font at all. The ids the templates <use> stay, the accessible name is the product's, and
+  # the authoring tool that draws the outlines stays on main.
+  local f="$TREE/php/public/img/logo.svg"
+  grep -q 'id="logo"' "$f" || { echo '  logo.svg lost id="logo"' >&2; return 1; }
+  grep -q 'id="wordmark"' "$f" || { echo '  logo.svg lost id="wordmark"' >&2; return 1; }
+  if grep -nE '<text|@font-face|data:font' "$f"; then
+    echo "  the lockup still depends on a font" >&2; return 1
+  fi
+  [ "$(sed -n '/<g id="wordmark">/,/<\/g>/p' "$f" | grep -c '<path ')" -ge 2 ] \
+    || { echo "  the wordmark has fewer than its two outline lines" >&2; return 1; }
+  grep -qF 'aria-label="APS Conecta Gestión AIO"' "$f" \
+    || { echo "  logo.svg's accessible name is not the product name" >&2; return 1; }
+  [ -f "$REPO_ROOT/scripts/lockup.py" ] || { echo "  scripts/lockup.py, the lockup's authoring tool, is missing" >&2; return 1; }
+}
+
+product_name() {  # 130: «APS Conecta Gestión AIO» on every operator surface (R19). The identity
+  # strings, the APS sentence, the buttons and the logo fallback present, the suite's own login
+  # link asserted by the test helper, and no «APS Conecta
+  # AIO», «Nextcloud AIO» or «All-in-One» left on any wizard surface. The suite inside is still
+  # Nextcloud — «su Nextcloud» stays (the declaration's nominative use).
+  local f s fail=0
+  while IFS='|' read -r f s; do
+    grep -qF "$s" "$TREE/$f" || { echo "  $f does not carry: $s" >&2; fail=1; }
+  done <<'EOF'
+php/templates/layout.twig|<title>APS Conecta Gestión AIO — Instalador</title>
+php/templates/log.twig|<title>APS Conecta Gestión AIO — Instalador</title>
+php/templates/containers.twig|<h1>APS Conecta Gestión AIO v
+php/templates/setup.twig|<h1>Configuración de APS Conecta Gestión AIO</h1>
+php/templates/login.twig|<h1>Inicio de sesión de APS Conecta Gestión AIO</h1>
+php/templates/already-installed.twig|<h2>APS Conecta Gestión AIO ya está instalado</h2>
+php/tests/tests/helpers.js|Abrir el inicio de sesión de APS Conecta Gestión AIO ↗
+php/templates/setup.twig|Instala y mantiene APS Conecta Gestión en este servidor
+php/templates/containers.twig|Instala y mantiene APS Conecta Gestión en este servidor
+php/templates/containers.twig|de su instancia de APS Conecta Gestión AIO,
+php/templates/already-installed.twig|>Abrir APS Conecta Gestión AIO</a>
+php/templates/setup.twig|Logotipo de APS Conecta Gestión</text>
+php/templates/login.twig|Logotipo de APS Conecta Gestión</text>
+php/templates/already-installed.twig|Logotipo de APS Conecta Gestión</text>
+EOF
+  if grep -rnE 'APS Conecta AIO|Nextcloud AIO|All-in-One|All-In-One' "$TREE/php/templates" \
+       "$TREE/php/public" --include='*.twig' --include='*.js' --include='*.svg' --include='*.css'; then
+    echo "  an upstream or pre-Gestión product name survives on a wizard surface" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+row 110 "the wizard's CSP lets its own brand fonts load — font-src 'self' on the real header line, default-src still 'none', no wider font source (R21)" \
+  csp_fonts_self
+
+row 120 "the banner lockup is outlines — no text, no embedded font, two outline lines in the wordmark, the product name as its accessible name, the authoring tool on main (R20)" \
+  lockup_outlines
+
+row 130 "the product name is APS Conecta Gestión AIO on every operator surface — titles, headings, the setup link the suite clicks, and no upstream or pre-Gestión name left (R19)" \
+  product_name
 
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
