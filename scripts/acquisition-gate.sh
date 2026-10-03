@@ -181,6 +181,135 @@ row 030 "the suite's skeleton posture is baked — NC_skeletondirectory="" ENV b
 row 030 "the bake's runtime half is wired — both aps-bake COPY lines and the ENV_PREFIX wiring grep present in the Dockerfile (a regeneration that drops them would otherwise replay green on every other row and ship an unbaked image — the one silently-unbaked-green path nothing else closes)" \
   bake_runtime_wired
 
+# ── L4 S4a: behaviour (R25 community + office, R29 defaults, R28 first-boot calls, R31) ──────
+
+s4_files() {  # PATH... — every file an S4 row reads must exist: a negative arm over a moved file
+  # would pass vacuously (grep's «no such file» reads as «no hit»)
+  local f fail=0
+  for f in "$@"; do [ -f "$f" ] || { echo "  no such file: $f — re-point this row" >&2; fail=1; }; done
+  [ "$fail" -eq 0 ]
+}
+
+# shellcheck disable=SC2016  # the pattern is the entrypoint's own shell text, not an expansion
+s4_install_block() {  # LINE — LINE sits in the entrypoint's fresh-install block: inside the
+  # `installed_version = 0.0.0.0` branch, after `occ maintenance:install`, before the first
+  # `occ maintenance:repair` that follows it (the repair runs the apps' repair steps; the first
+  # cron comes later still)
+  local e="$TREE/Containers/nextcloud/entrypoint.sh" z i r l
+  z="$(grep -nF 'if [ "$installed_version" = "0.0.0.0" ]; then' "$e" | head -1 | cut -d: -f1)"
+  i="$(awk -v z="${z:-0}" 'NR > z && /occ maintenance:install/ {print NR; exit}' "$e")"
+  r="$(awk -v i="${i:-0}" 'NR > i && /occ maintenance:repair$/ {print NR; exit}' "$e")"
+  l="$(grep -nF -e "$1" "$e" | head -1 | cut -d: -f1)"
+  if [ -z "$z" ] || [ -z "$i" ] || [ -z "$r" ] || [ -z "$l" ] || [ "$l" -le "$i" ] || [ "$l" -ge "$r" ]; then
+    echo "  not in the fresh-install block (branch :${z:-?}, install :${i:-?}, line :${l:-?}, repair :${r:-?}): $1" >&2; return 1
+  fi
+  if sed -n "${l}p" "$e" | grep -q '^[[:space:]]*#'; then echo "  commented out in the fresh-install block: $1" >&2; return 1; fi
+}
+
+community_channel_closed() {  # 190: the image ships no community container (R25). The third-party
+  # channel upstream offers next to health data (AzuraCast, Jellyfin, Vaultwarden, …) is closed at
+  # its source: the mastercontainer image creates an EMPTY community-containers directory (DataConst
+  # realpaths it, so it must exist), the page no longer includes the section (a17's own arm) and the
+  # template is gone, the restore note about community backups is gone, and the options script
+  # tolerates the absent form. A crafted community-form POST has nothing to enable:
+  # ConfigurationController keeps only ids the directory lists.
+  local d="$TREE/Containers/mastercontainer/Dockerfile" c="$TREE/php/templates/containers.twig" \
+        j="$TREE/php/public/containers-form-submit.js" fail=0
+  s4_files "$d" "$c" "$j" || return 1
+  if grep -n 'COPY community-containers' "$d"; then echo "  the image still copies upstream's community containers" >&2; fail=1; fi
+  grep -qF 'RUN mkdir -p /var/www/docker-aio/community-containers' "$d" \
+    || { echo "  the image no longer creates the empty community-containers directory DataConst reads" >&2; fail=1; }
+  if grep -nF 'community-containers.twig' "$c"; then echo "  containers.twig still includes the community section" >&2; fail=1; fi
+  if [ -e "$TREE/php/templates/includes/community-containers.twig" ]; then
+    echo "  the community section's template still ships" >&2; fail=1
+  fi
+  if grep -niE 'comunitari' "$c"; then echo "  containers.twig still talks about community containers" >&2; fail=1; fi
+  if grep -n 'communityFormSubmit\.' "$j" | grep -v 'if (communityFormSubmit)'; then
+    echo "  containers-form-submit.js dereferences the absent community form" >&2; fail=1
+  fi
+  # the restore button keeps a confirm: the restore spec accepts a dialog right before it clicks
+  grep -qF "data-confirm='¿Restaurar la copia de seguridad seleccionada? Se reemplazará la instancia completa.'" "$c" \
+    || { echo "  the restore button lost the confirm its spec accepts" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 190 "the image ships no community container — an empty directory instead of upstream's set, no community section or template, no community restore note, the options script tolerant of the absent form (R25)" \
+  community_channel_closed
+
+# shellcheck disable=SC2016  # the patterns are literal PHP — their $ is not a shell expansion
+office_is_euro_office() {  # 200: the suite's office is Euro-Office, and only Euro-Office (R25, D12 b).
+  # The options form refuses any other office_suite_choice — the one PHP guard, its throw on the
+  # line after the test, both before the setter — with a 422 and a Spanish message, and the page
+  # no longer offers «Desactivar suite de oficina». Setup's first-boot copy of the default
+  # (Setup.php:28) never passes through the controller, so the guard cannot refuse the suite's own
+  # default; gestion's drive never posts an office choice.
+  local k="$TREE/php/src/Controller/ConfigurationController.php" \
+        o="$TREE/php/templates/includes/optional-containers.twig" s="$TREE/php/tests/tests/initial-setup.spec.js" fail=0 g w
+  s4_files "$k" "$o" "$s" "$TREE/php/public/style.css" || return 1
+  g="$(grep -nF 'if ($officeSuite !== OfficeSuite::Eurooffice) {' "$k" | head -1 | cut -d: -f1)"
+  w="$(grep -nF '$this->configurationManager->officeSuite = $officeSuite;' "$k" | head -1 | cut -d: -f1)"
+  if [ -z "$g" ] || [ -z "$w" ] || [ "$g" -ge "$w" ]; then
+    echo "  ConfigurationController stores an office choice without refusing a non-Euro-Office one first" >&2; fail=1
+  fi
+  grep -A1 -F 'if ($officeSuite !== OfficeSuite::Eurooffice) {' "$k" \
+    | grep -qF "throw new InvalidSettingConfigurationException('La oficina de la suite es Euro-Office: no se puede cambiar ni desactivar.');" \
+    || { echo "  the refusal does not throw its Spanish message inside the guard" >&2; fail=1; }
+  if grep -n 'office-none' "$o" "$TREE/php/public/style.css"; then echo "  the page still offers (or styles) disabling the office suite" >&2; fail=1; fi
+  if [ -e "$TREE/php/public/img/office-none.svg" ]; then echo "  the office-none icon still ships" >&2; fail=1; fi
+  grep -qF 'id="office-eurooffice"' "$o" || { echo "  the Euro-Office card is gone (the guard's positive control)" >&2; fail=1; }
+  if grep -nE "Desactivar suite de oficina|#office-none" "$s"; then
+    echo "  initial-setup.spec.js still disables the office suite" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+row 200 "the suite's office is Euro-Office only — any other office choice is refused before it is stored (422, Spanish), and the page offers no way to disable it (R25, D12 b)" \
+  office_is_euro_office
+
+options_start_off() {  # 210: Talk, Whiteboard and Imaginary start off (R29, R27.5/7; D12 a) — the
+  # three PHP default literals Setup.php copies into a fresh config. Gestion's step 7 turns Talk on
+  # where the server's memory and cores allow; the translated suite's persisted-defaults spec
+  # expects the same three falses.
+  local m="$TREE/php/src/Data/ConfigurationManager.php" s="$TREE/php/tests/tests/persist-default-config.spec.js" fail=0 k
+  s4_files "$m" "$s" || return 1
+  for k in isTalkEnabled isWhiteboardEnabled isImaginaryEnabled; do
+    grep -qF "get => (bool) \$this->get('$k', false);" "$m" || { echo "  $k does not default to off" >&2; fail=1; }
+    if grep -nF "get('$k', true)" "$m"; then echo "  a $k getter still defaults on" >&2; fail=1; fi
+    grep -qF "$k: false," "$s" || { echo "  persist-default-config.spec.js does not expect $k off" >&2; fail=1; }
+  done
+  [ "$fail" -eq 0 ]
+}
+
+row 210 "Talk, Whiteboard and Imaginary start off — the three PHP defaults a fresh config copies, and the suite's spec expecting them (R29, D12 a)" \
+  options_start_off
+
+first_boot_quiet() {  # 220: a fresh install calls nothing it does not need (R28, the AIO side):
+  # whiteboard's npm never asks the registry about its own update (when Whiteboard is enabled —
+  # 210 starts it off), and nextcloud_announcements is disabled in the fresh-install block, before
+  # its first cron run fetches pushfeed.nextcloud.com. The rest of R28 (the connectivity check, the
+  # resolver noise, HIBP, the tiles image) is gestion's or the published allowlist's.
+  local w="$TREE/Containers/whiteboard/Dockerfile" fail=0
+  s4_files "$w" "$TREE/Containers/nextcloud/entrypoint.sh" || return 1
+  grep -qF 'ENV NPM_CONFIG_UPDATE_NOTIFIER=false' "$w" || { echo "  whiteboard's npm still checks for its own update" >&2; fail=1; }
+  s4_install_block 'php /var/www/html/occ app:disable nextcloud_announcements' || fail=1
+  [ "$fail" -eq 0 ]
+}
+
+row 220 "a fresh install calls nothing it does not need — whiteboard's npm update check off, nextcloud_announcements disabled before its first cron (R28)" \
+  first_boot_quiet
+
+circles_probe_skipped() {  # 230: the fresh install logs no «relation "oc_circle_circles" does not
+  # exist» (R31): circles' migration_22 is marked done between the install and the first repair,
+  # so the repair never probes the legacy table a fresh install does not have. The theming
+  # background job's one-shot error needs no patch: gestion's phase 15 stores the brand images,
+  # which creates appdata theming/global.
+  s4_files "$TREE/Containers/nextcloud/entrypoint.sh" || return 1
+  s4_install_block 'php /var/www/html/occ config:app:set circles migration_22 --value=1'
+}
+
+row 230 "the fresh install skips circles' legacy-table probe — migration_22 marked done between the install and the first repair (R31)" \
+  circles_probe_skipped
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1
