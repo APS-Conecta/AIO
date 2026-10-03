@@ -36,6 +36,7 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 190 | no community containers — the image ships none and the page has no section |
 | 200 | the office is Euro-Office only — other choices refused (PHP, declared) |
 | 210 | Talk, Whiteboard and Imaginary start off (PHP defaults, declared) |
+| 220 | a fresh install calls nothing it does not need — whiteboard's npm update check, the announcements feed |
 
 **PHP logic changes only where declared.** Every other modification is a string, an asset, a
 template, or Dockerfile plumbing, carried as a patch the CI replays and the gates verify. The

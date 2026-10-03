@@ -278,6 +278,21 @@ options_start_off() {  # 210: Talk, Whiteboard and Imaginary start off (R29, R27
 row 210 "Talk, Whiteboard and Imaginary start off — the three PHP defaults a fresh config copies, and the suite's spec expecting them (R29, D12 a)" \
   options_start_off
 
+first_boot_quiet() {  # 220: a fresh install calls nothing it does not need (R28, the AIO side):
+  # whiteboard's npm never asks the registry about its own update (when Whiteboard is enabled —
+  # 210 starts it off), and nextcloud_announcements is disabled in the fresh-install block, before
+  # its first cron run fetches pushfeed.nextcloud.com. The rest of R28 (the connectivity check, the
+  # resolver noise, HIBP, the tiles image) is gestion's or the published allowlist's.
+  local w="$TREE/Containers/whiteboard/Dockerfile" fail=0
+  s4_files "$w" "$TREE/Containers/nextcloud/entrypoint.sh" || return 1
+  grep -qF 'ENV NPM_CONFIG_UPDATE_NOTIFIER=false' "$w" || { echo "  whiteboard's npm still checks for its own update" >&2; fail=1; }
+  s4_install_block 'php /var/www/html/occ app:disable nextcloud_announcements' || fail=1
+  [ "$fail" -eq 0 ]
+}
+
+row 220 "a fresh install calls nothing it does not need — whiteboard's npm update check off, nextcloud_announcements disabled before its first cron (R28)" \
+  first_boot_quiet
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1
