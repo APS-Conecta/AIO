@@ -32,6 +32,7 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 150 | the suite's values pre-filled — America/Santiago, `/srv/aps-conecta/respaldos`, a gestion domain pattern |
 | 160 | the page offers only what the suite ships — the baked Hub, the suite version, the office card, no ExApp proxies, no «mastercontainer» jargon |
 | 170 | the post-start page: the update path, «Suite en marcha», no Docker prune button (the route stays — zero PHP), the suite's names |
+| 180 | the wizard laid out for a 360 px phone |
 
 **No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
 an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates

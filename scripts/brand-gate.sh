@@ -702,6 +702,26 @@ EOF
 row 170 "the post-start page says only true, APS things — the update path, «Suite en marcha», no territorio card, no docker prune button, the suite's names on the credentials, the open button, the container list and the prose, and the suite asserting the same bytes (R27)" \
   post_start_page
 
+phone_layout() {  # 180: the wizard fits a 360px phone. layout.twig declares the viewport (only
+  # containers.twig's <head> stub inside its body block and log.twig did), the setup/login card
+  # flows under 640px instead of floating at a fixed 500px, and both stylesheet links carry the
+  # new cache key so a warm cache cannot serve the old sheet.
+  local t="$TREE/php/templates" css="$TREE/php/public/style.css" fail=0 block
+  s3_files "$t/layout.twig" "$t/log.twig" "$t/containers.twig" "$css" || return 1
+  grep -qF '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>' "$t/layout.twig" \
+    || { echo "  layout.twig declares no viewport" >&2; fail=1; }
+  if grep -n '<head>' "$t/containers.twig"; then echo "  containers.twig still carries a <head> stub in its body" >&2; fail=1; fi
+  block="$(sed -n '/^@media only screen and (max-width: 640px) {/,/^}/p' "$css")"
+  case "$block" in *".login {"*"position: static;"*"transform: none;"*"width: auto;"*) ;;
+    *) echo "  style.css has no 640px rule letting the login card flow" >&2; fail=1 ;; esac
+  grep -qF 'href="style.css?v16"' "$t/layout.twig" || { echo "  layout.twig still links the old stylesheet key" >&2; fail=1; }
+  grep -qF 'href="style.css?v16"' "$t/log.twig" || { echo "  log.twig still links the old stylesheet key" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 180 "the wizard fits a 360px phone — the viewport declared, the login card flowing under 640px, the stylesheet's cache key bumped" \
+  phone_layout
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
