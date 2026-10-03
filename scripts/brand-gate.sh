@@ -863,6 +863,18 @@ installer_certificate() {  # 235: apache serves the installer's own certificate 
 row 235 "apache serves the installer's own certificate when one is mounted — APS_TLS_DIR bound read-only into apache alone, the file certificate and default_sni on 443 with both files, else upstream's ACME stanza; the routes one snippet (R22, declared PHP: the setting and its bind)" \
   installer_certificate
 
+harness_reset_eurooffice() {  # 237: the suite harness's reset removes Euro-Office too. It is always on
+  # (patch 200): a running one survived the reset and locked the next fresh wizard's options (S5).
+  local run="$TREE/php/tests/run.sh"
+  s3_files "$run" || return 1
+  { grep -F 'docker container rm --force' "$run" | grep -qF ',collabora,eurooffice,borgbackup}' \
+      && grep -F 'docker volume rm' "$run" | grep -qF ',elasticsearch,eurooffice,eurooffice_data}'; } \
+    || { echo "  run.sh's reset does not remove the Euro-Office container and its two volumes" >&2; return 1; }
+}
+
+row 237 "the suite harness's reset removes the Euro-Office container and its two volumes — always on, a running one locked the next wizard's options" \
+  harness_reset_eurooffice
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
