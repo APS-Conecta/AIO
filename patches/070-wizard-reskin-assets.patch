@@ -4790,7 +4790,7 @@ index 94b07449..00000000
 -</svg>
 \ No newline at end of file
 diff --git a/php/public/style.css b/php/public/style.css
-index 22ad5975..4555b672 100644
+index ee203bdc..5046b7ce 100644
 --- a/php/public/style.css
 +++ b/php/public/style.css
 @@ -1,23 +1,49 @@
@@ -4888,7 +4888,7 @@ index 22ad5975..4555b672 100644
      background-color: var(--color-main-background);
      color: var(--color-main-text);
  }
-@@ -254,7 +260,7 @@ svg:not(:has(use)) .fallback-text {
+@@ -255,7 +261,7 @@ svg:not(:has(use)) .fallback-text {
      min-width: 100vw;
      position: fixed;
      width: 100vw;
@@ -4897,7 +4897,7 @@ index 22ad5975..4555b672 100644
      background-position: center;
      background-repeat: no-repeat;
      background-size: cover;
-@@ -262,10 +268,6 @@ svg:not(:has(use)) .fallback-text {
+@@ -263,10 +269,6 @@ svg:not(:has(use)) .fallback-text {
      overflow: hidden;
  }
  
@@ -4908,8 +4908,8 @@ index 22ad5975..4555b672 100644
  form {
      margin: 0;
  }
-@@ -305,20 +307,6 @@ select:focus {
-     border: 1px solid var(--color-main-border);
+@@ -361,20 +363,6 @@ select:focus {
+     mask-image: url("img/eye-off.svg");
  }
  
 -/* Scroll bar for dark mode */
@@ -4929,7 +4929,7 @@ index 22ad5975..4555b672 100644
  /* Scroll bar for light mode */
  ::-webkit-scrollbar {
      width: 8px; /* Width of the scroll bar */
-@@ -523,60 +511,6 @@ input[type="checkbox"]:disabled:not(:checked) + label {
+@@ -579,60 +567,6 @@ input[type="checkbox"]:disabled:not(:checked) + label {
      100% { transform: rotate(360deg); }
  }
  
@@ -4990,7 +4990,7 @@ index 22ad5975..4555b672 100644
  /* Office Suite Feature Cards */
  .office-suite-cards {
      display: grid;
-@@ -609,17 +543,13 @@ input[type="checkbox"]:disabled:not(:checked) + label {
+@@ -665,17 +599,13 @@ input[type="checkbox"]:disabled:not(:checked) + label {
  
  .office-card:hover {
      border-color: var(--color-primary-element);
@@ -5010,7 +5010,7 @@ index 22ad5975..4555b672 100644
  }
  
  .office-card-header {
-@@ -732,8 +662,26 @@ input[type="checkbox"]:disabled:not(:checked) + label {
+@@ -788,8 +718,26 @@ input[type="checkbox"]:disabled:not(:checked) + label {
      font-weight: 600;
  }
  
@@ -5106,7 +5106,7 @@ index e4d7bee0..cb6a41c7 100644
          <p>Si no vio una contraseña en esta página durante la primera instalación, debería reinstalar toda la instancia, ya que la contraseña podría haber sido robada.</p>
          <p>Consulte <a target="_blank" href="https://github.com/nextcloud/all-in-one#how-to-properly-reset-the-instance">esta documentación</a> al respecto.</p>
 diff --git a/php/templates/containers.twig b/php/templates/containers.twig
-index dc7dd73c..384435d6 100644
+index 14430059..a2cf3a9e 100644
 --- a/php/templates/containers.twig
 +++ b/php/templates/containers.twig
 @@ -6,7 +6,7 @@
@@ -5145,7 +5145,7 @@ index dc7dd73c..384435d6 100644
                              {% if isAnyRestarting == false %}
                                  <p><span class="status running"></span> Los contenedores se están iniciando actualmente. Puede inspeccionar los registros de los contenedores haciendo clic en <strong>Iniciando</strong>, junto a cada contenedor, para obtener más detalles.</p>
 diff --git a/php/templates/layout.twig b/php/templates/layout.twig
-index b22abceb..cab8c523 100644
+index 0387e41b..07dfcffa 100644
 --- a/php/templates/layout.twig
 +++ b/php/templates/layout.twig
 @@ -1,11 +1,10 @@
@@ -5153,14 +5153,14 @@ index b22abceb..cab8c523 100644
  <html lang="es">
      <head>
 -        <title>AIO</title>
--        <link rel="stylesheet" href="style.css?v13" media="all" />
+-        <link rel="stylesheet" href="style.css?v14" media="all" />
 -        <link rel="icon" href="img/favicon.png">
 +        <title>APS Conecta AIO — Instalador</title>
-+        <link rel="stylesheet" href="style.css?v14" media="all" />
++        <link rel="stylesheet" href="style.css?v15" media="all" />
 +        <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
          <script type="text/javascript" src="forms.js?v2"></script>
 -        <script type="text/javascript" src="toggle-dark-mode.js?v2"></script>
-         <script type="text/javascript" src="click-handlers.js?v2"></script>
+         <script type="text/javascript" src="click-handlers.js?v3"></script>
      </head>
  
 @@ -17,8 +16,5 @@
@@ -5173,7 +5173,7 @@ index b22abceb..cab8c523 100644
      </body>
  </html>
 diff --git a/php/templates/log.twig b/php/templates/log.twig
-index 246e702b..ddb234d5 100644
+index d756f506..a0844f33 100644
 --- a/php/templates/log.twig
 +++ b/php/templates/log.twig
 @@ -1,10 +1,10 @@
@@ -5182,8 +5182,8 @@ index 246e702b..ddb234d5 100644
 -        <title>AIO</title>
 +        <title>APS Conecta AIO — Instalador</title>
          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
--        <link rel="stylesheet" href="style.css?v13">
-+        <link rel="stylesheet" href="style.css?v14">
+-        <link rel="stylesheet" href="style.css?v14">
++        <link rel="stylesheet" href="style.css?v15">
          <link rel="stylesheet" href="logs.css?v1">
 -        <link rel="icon" href="img/favicon.png">
 +        <link rel="icon" href="img/favicon.svg" type="image/svg+xml">

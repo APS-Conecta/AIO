@@ -109,6 +109,7 @@ php/public/forms.js|Server error. Please check|Error del servidor.
 php/public/second-tab-warning.js|Cannot open multiple instances|No se pueden abrir múltiples instancias
 php/public/containers-form-submit.js|The docker socket proxy container is deprecated|El contenedor docker socket proxy está obsoleto
 php/public/log-load.js|statusElem.textContent = 'enabled';|statusElem.textContent = 'activada';
+php/public/click-handlers.js|reveal ? 'Hide passphrase' : 'Show passphrase'|reveal ? 'Ocultar frase de contraseña' : 'Mostrar frase de contraseña'
 EOF
 }
 
@@ -248,7 +249,7 @@ row 060 "the operator-visible changelog links point at the fork's releases — z
 row 060 "the changelog arms land on APS-Conecta/AIO's releases page (the repoint's positive control)" \
   fork_changelog_present
 
-row 060 "the es-CL sweep left no English on any wizard surface — per-file sentinels gone (15 files: containers, includes, components, small views, public JS)" \
+row 060 "the es-CL sweep left no English on any wizard surface — per-file sentinels gone (16 files: containers, includes, components, small views, public JS)" \
   escl_sweep absent
 
 row 060 "the es-CL sweep landed on every wizard surface — per-file es-CL sentinels present (the sweep's positive control)" \

@@ -153,10 +153,10 @@ index 5e575878..00000000
 -    });
 -})();
 diff --git a/php/public/style.css b/php/public/style.css
-index 17a39f9b..22ad5975 100644
+index 51c3f8e5..ee203bdc 100644
 --- a/php/public/style.css
 +++ b/php/public/style.css
-@@ -496,78 +496,6 @@ input[type="checkbox"]:disabled:not(:checked) + label {
+@@ -552,78 +552,6 @@ input[type="checkbox"]:disabled:not(:checked) + label {
      background-color: var(--color-main-background);
  }
  
@@ -236,7 +236,7 @@ index 17a39f9b..22ad5975 100644
      padding: 1rem;
      font-family: monospace, system-ui, -apple-system, 'Segoe UI', Roboto, Oxygen-Sans, Cantarell, Ubuntu, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 diff --git a/php/templates/containers.twig b/php/templates/containers.twig
-index fdf90a2a..ea0bc9aa 100644
+index 235ee282..4936133f 100644
 --- a/php/templates/containers.twig
 +++ b/php/templates/containers.twig
 @@ -112,29 +112,11 @@
@@ -280,7 +280,7 @@ index fdf90a2a..ea0bc9aa 100644
                                  <p>Clicking on the button below will download all docker containers and start them. This can take a long time depending on your internet connection. Since the overall size is a few GB, this can take around 5-10 min or more. Please be patient!</p>
                              {% endif %}
                                  {% if was_start_button_clicked == false %}
-@@ -385,22 +364,6 @@
+@@ -388,22 +367,6 @@
  
                      {% if was_start_button_clicked == true %}
  
@@ -305,7 +305,7 @@ index fdf90a2a..ea0bc9aa 100644
                              <p>The backup section is disabled via environmental variable.</p>
 diff --git a/php/templates/desec.twig b/php/templates/desec.twig
 deleted file mode 100644
-index 70c96259..00000000
+index ff80405f..00000000
 --- a/php/templates/desec.twig
 +++ /dev/null
 @@ -1,30 +0,0 @@
@@ -314,10 +314,10 @@ index 70c96259..00000000
 -    <head>
 -        <title>Register a free deSEC domain</title>
 -        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
--        <link rel="stylesheet" href="style.css?v13" media="all" />
+-        <link rel="stylesheet" href="style.css?v14" media="all" />
 -        <link rel="icon" href="img/favicon.png">
 -        <script type="text/javascript" src="forms.js?v2"></script>
--        <script type="text/javascript" src="click-handlers.js?v2"></script>
+-        <script type="text/javascript" src="click-handlers.js?v3"></script>
 -        <script type="text/javascript" src="apply-theme.js"></script>
 -    </head>
 -    <body>
