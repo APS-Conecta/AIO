@@ -30,10 +30,10 @@ index 5140d28e..c7879f65 100644
      }
  
 diff --git a/php/tests/tests/initial-setup.spec.js b/php/tests/tests/initial-setup.spec.js
-index 5ac0ab73..7e23631c 100755
+index 5ac0ab73..4580d50b 100755
 --- a/php/tests/tests/initial-setup.spec.js
 +++ b/php/tests/tests/initial-setup.spec.js
-@@ -24,11 +24,7 @@ test('Initial setup', async ({ page: setupPage }) => {
+@@ -24,15 +24,17 @@ test('Initial setup', async ({ page: setupPage }) => {
    await containersPage.locator('#domain').fill('example.com');
    await containersPage.getByRole('button', { name: 'Enviar dominio' }).click();
  
@@ -46,6 +46,16 @@ index 5ac0ab73..7e23631c 100755
    await expect(containersPage.locator('#talk')).not.toBeChecked()
    await expect(containersPage.getByRole('checkbox', { name: 'Whiteboard' })).not.toBeChecked()
    await expect(containersPage.getByRole('checkbox', { name: 'Imaginary' })).not.toBeChecked()
+   await expect(containersPage.locator('#office-eurooffice')).toBeChecked()
++  await containersPage.locator('#talk').check();
++  await containersPage.getByRole('button', { name: 'Guardar cambios' }).last().click();
++  await expect(containersPage.locator('#talk')).toBeChecked()
++  await containersPage.locator('#talk').uncheck();
++  await containersPage.getByRole('button', { name: 'Guardar cambios' }).last().click();
++  await expect(containersPage.locator('#talk')).not.toBeChecked()
+ 
+   // Reject invalid time zones (PHP-borne English: ConfigurationManager.php:1037 — stays, zero-PHP)
+   await containersPage.locator('#timezone').click();
 diff --git a/php/tests/tests/persist-default-config.spec.js b/php/tests/tests/persist-default-config.spec.js
 index 55f061e8..1582d611 100644
 --- a/php/tests/tests/persist-default-config.spec.js

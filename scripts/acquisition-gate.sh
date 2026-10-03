@@ -203,6 +203,7 @@ s4_install_block() {  # LINE — LINE sits in the entrypoint's fresh-install blo
   if [ -z "$z" ] || [ -z "$i" ] || [ -z "$r" ] || [ -z "$l" ] || [ "$l" -le "$i" ] || [ "$l" -ge "$r" ]; then
     echo "  not in the fresh-install block (branch :${z:-?}, install :${i:-?}, line :${l:-?}, repair :${r:-?}): $1" >&2; return 1
   fi
+  if sed -n "${l}p" "$e" | grep -q '^[[:space:]]*#'; then echo "  commented out in the fresh-install block: $1" >&2; return 1; fi
 }
 
 community_channel_closed() {  # 190: the image ships no community container (R25). The third-party
@@ -223,9 +224,12 @@ community_channel_closed() {  # 190: the image ships no community container (R25
     echo "  the community section's template still ships" >&2; fail=1
   fi
   if grep -niE 'comunitari' "$c"; then echo "  containers.twig still talks about community containers" >&2; fail=1; fi
-  if grep -nE '^\s*communityFormSubmit\.style' "$j"; then
+  if grep -n 'communityFormSubmit\.' "$j" | grep -v 'if (communityFormSubmit)'; then
     echo "  containers-form-submit.js dereferences the absent community form" >&2; fail=1
   fi
+  # the restore button keeps a confirm: the restore spec accepts a dialog right before it clicks
+  grep -qF "data-confirm='¿Restaurar la copia de seguridad seleccionada? Se reemplazará la instancia completa.'" "$c" \
+    || { echo "  the restore button lost the confirm its spec accepts" >&2; fail=1; }
   [ "$fail" -eq 0 ]
 }
 
@@ -241,7 +245,7 @@ office_is_euro_office() {  # 200: the suite's office is Euro-Office, and only Eu
   # default; gestion's drive never posts an office choice.
   local k="$TREE/php/src/Controller/ConfigurationController.php" \
         o="$TREE/php/templates/includes/optional-containers.twig" s="$TREE/php/tests/tests/initial-setup.spec.js" fail=0 g w
-  s4_files "$k" "$o" "$s" || return 1
+  s4_files "$k" "$o" "$s" "$TREE/php/public/style.css" || return 1
   g="$(grep -nF 'if ($officeSuite !== OfficeSuite::Eurooffice) {' "$k" | head -1 | cut -d: -f1)"
   w="$(grep -nF '$this->configurationManager->officeSuite = $officeSuite;' "$k" | head -1 | cut -d: -f1)"
   if [ -z "$g" ] || [ -z "$w" ] || [ "$g" -ge "$w" ]; then
@@ -250,7 +254,8 @@ office_is_euro_office() {  # 200: the suite's office is Euro-Office, and only Eu
   grep -A1 -F 'if ($officeSuite !== OfficeSuite::Eurooffice) {' "$k" \
     | grep -qF "throw new InvalidSettingConfigurationException('La oficina de la suite es Euro-Office: no se puede cambiar ni desactivar.');" \
     || { echo "  the refusal does not throw its Spanish message inside the guard" >&2; fail=1; }
-  if grep -n 'office-none' "$o"; then echo "  the page still offers to disable the office suite" >&2; fail=1; fi
+  if grep -n 'office-none' "$o" "$TREE/php/public/style.css"; then echo "  the page still offers (or styles) disabling the office suite" >&2; fail=1; fi
+  if [ -e "$TREE/php/public/img/office-none.svg" ]; then echo "  the office-none icon still ships" >&2; fail=1; fi
   grep -qF 'id="office-eurooffice"' "$o" || { echo "  the Euro-Office card is gone (the guard's positive control)" >&2; fail=1; }
   if grep -nE "Desactivar suite de oficina|#office-none" "$s"; then
     echo "  initial-setup.spec.js still disables the office suite" >&2; fail=1
