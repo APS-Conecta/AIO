@@ -60,7 +60,7 @@ usage() {
 usage: scripts/retag.sh <command> [args]
   list                                  the sibling image names parsed from php/containers.json
   sed FILE                              apply the org swap in place + verify (patch 010's generator)
-  retag TAG [--channel CH] [--force]    the registry-side walk (every sibling except the baked one)
+  retag TAG [--channel CH] [--force]    the registry-side walk (every sibling except the built ones)
   matrix TAG [--channel CH]             the gate: all images present + the retagged match one snapshot
   manifest TAG                          the publish record, JSON on stdout
 EOF
@@ -96,6 +96,12 @@ siblings_load() { # fill SIBS once per run, floor-guarded — a shrunken parse m
   mapfile -t SIBS < <(list)
   [ "${#SIBS[@]}" -ge "$MIN_SIBLINGS" ] \
     || die "only ${#SIBS[@]} siblings parsed from $CONTAINERS — expected at least $MIN_SIBLINGS; a green walk over a shrunken set would be green without looking"
+  # A built image upstream renamed would be retagged unpatched under its new name, and ours orphaned
+  local b
+  for b in "${BUILD_IMAGES[@]}"; do
+    printf '%s\n' "${SIBS[@]}" | grep -qxF "$b" \
+      || die "built image '$b' is not a sibling in $CONTAINERS — upstream renamed or dropped it; fix BUILD_IMAGES and images.yml's build job"
+  done
 }
 
 tag_valid() { # TAG — a channel-valid Docker tag. ':' and '@' are excluded BY the charset itself; the

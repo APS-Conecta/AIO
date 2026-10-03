@@ -821,9 +821,10 @@ installer_certificate() {  # 235: apache serves the installer's own certificate 
   # mastercontainer refuses a relative path). start.sh writes the file certificate and default_sni — a
   # client by IP sends no SNI — only on 443 with both files readable, else upstream's ACME stanza, whole.
   # The routes sit in a snippet both site blocks import: a file-certificate site cannot share a block with
-  # the plain :23973 address. The tls placeholder sits after the last import (the site block's own), the
-  # default_sni one before the snippet (the global options), and «auto_https» stays on one line: start.sh
-  # rewrites every line matching it.
+  # the plain :23973 address. The tls placeholder is the site block's last line, after its import and
+  # before the file's closing brace; the default_sni one sits before the snippet (the global options).
+  # «auto_https» and «ADDITIONAL_TRUSTED_DOMAIN» stay on one line each: start.sh rewrites every line
+  # matching the first and deletes every line naming the second when it is empty.
   local j="$TREE/php/containers.json" f="$TREE/php/src/ContainerDefinitionFetcher.php" \
         m="$TREE/php/src/Data/ConfigurationManager.php" mc="$TREE/Containers/mastercontainer/start.sh" \
         c="$TREE/Containers/apache/Caddyfile" s="$TREE/Containers/apache/start.sh" fail=0 nr ni nt ns
@@ -844,11 +845,14 @@ installer_certificate() {  # 235: apache serves the installer's own certificate 
   ns="$(grep -nxF '    # default_sni placeholder' "$c" | cut -d: -f1)"
   { [ "$(grep -cxF '    import aps_routes' "$c")" -eq 2 ] && [ -n "$nr" ]; } \
     || { echo "  the Caddyfile's routes are not one snippet imported by both blocks" >&2; fail=1; }
-  { [ -n "$nt" ] && [ -n "$ni" ] && [ "$nt" -gt "$ni" ]; } \
+  { [ -n "$nt" ] && [ -n "$ni" ] && [ "$nt" -gt "$ni" ] && [ "$nt" -eq "$(( $(wc -l < "$c") - 1 ))" ] \
+      && [ "$(tail -n 1 "$c")" = '}' ]; } \
     || { echo "  the Caddyfile's tls placeholder is missing or outside the site block" >&2; fail=1; }
   { [ -n "$ns" ] && [ -n "$nr" ] && [ "$ns" -lt "$nr" ]; } \
     || { echo "  the Caddyfile's default_sni placeholder is missing or outside the global options" >&2; fail=1; }
   [ "$(grep -c 'auto_https' "$c")" -eq 1 ] || { echo "  a second Caddyfile line names auto_https — start.sh would rewrite it" >&2; fail=1; }
+  [ "$(grep -c 'ADDITIONAL_TRUSTED_DOMAIN' "$c")" -eq 1 ] \
+    || { echo "  a second Caddyfile line names ADDITIONAL_TRUSTED_DOMAIN — start.sh would delete it" >&2; fail=1; }
   if grep -nF 'issuer acme' "$c"; then echo "  the Caddyfile still hard-codes the ACME issuer" >&2; fail=1; fi
   { grep -qF "if [ \"\$APACHE_PORT\" = '443' ] && [ -r /aps-tls/tls.crt ] && [ -r /aps-tls/tls.key ]; then" "$s" \
       && grep -qF "TLS_STANZA='tls /aps-tls/tls.crt /aps-tls/tls.key'" "$s" \
