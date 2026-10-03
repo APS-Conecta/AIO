@@ -1,6 +1,6 @@
 <!-- aps-fork-declaration-start -->
 > [!IMPORTANT]
-> **This is APS Conecta AIO — Instalador, a fork of
+> **This is APS Conecta Gestión AIO — Instalador, a fork of
 > [Nextcloud All-in-One](https://github.com/nextcloud/all-in-one)** maintained by
 > [APS Conecta](https://github.com/APS-Conecta) for Chilean primary-healthcare clinics
 > (CESFAM and the APS network). It is **not** produced by, affiliated with, sponsored, or
@@ -24,13 +24,17 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 070 | the wizard re-skinned to the APS Conecta identity |
 | 080 | the three php/src registry references re-pointed at this fork |
 | 090 | the wizard's Playwright suite translated to assert the es-CL bytes |
+| 100 | the first-party `office` overview app disabled while Euro-Office is the suite's office |
+| 110 | the wizard's content security policy lets its own brand fonts load |
+| 120 | the banner lockup drawn as outlines (`scripts/lockup.py`), so it needs no font |
+| 130 | the product named «APS Conecta Gestión AIO» on every wizard surface |
 
 **No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
 an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates
 verify; the sole PHP-side string changes are patch 080's three registry references.
 
-**What the operator sees.** The wizard presents itself as «APS Conecta AIO — Instalador»;
-an already-installed instance greets with «APS Conecta AIO ya está instalado»; the territorio
+**What the operator sees.** The wizard presents itself as «APS Conecta Gestión AIO — Instalador»;
+an already-installed instance greets with «APS Conecta Gestión AIO ya está instalado»; the territorio
 app's card reads «pendiente de empaquetado» until that app ships. These are the shipped bytes
 — the brand gate proves them equal to this declaration on every replay.
 
@@ -50,8 +54,8 @@ this is the complete list, by source:
 The translated Playwright suite (`php/tests`, patch 090) keeps English assertions on three of
 these as its own canary that the sweep never bled into PHP.
 
-**Nominative use.** Translated prose keeps the product's own names where the sentence is about
-the software (the wizard's login screen says «frase de contraseña de Nextcloud AIO»), and the
+**Nominative use.** The wizard names itself «APS Conecta Gestión AIO»; translated prose keeps
+«Nextcloud» where the sentence is about the software inside the suite («su Nextcloud»), and the
 wizard's documentation links point at Nextcloud's own manuals on purpose — those documents
 describe the software the clinic runs. The image labels are byte-identical upstream,
 deliberately, and both readings are recorded: `org.opencontainers.image.vendor` says
