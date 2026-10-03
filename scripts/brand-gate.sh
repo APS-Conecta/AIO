@@ -815,6 +815,54 @@ ip_when_skipped() {  # 233: an IP is a valid domain while domain validation is s
 row 233 'an IP is accepted as the domain only while domain validation is skipped — the install by IP over HTTPS (R22, declared PHP); with validation on it is refused, and the suite asserts that in restore-instance' \
   ip_when_skipped
 
+# shellcheck disable=SC2016  # the shell, PHP and Caddyfile lines are matched as bytes
+installer_certificate() {  # 235: apache serves the installer's own certificate when one is mounted (R22).
+  # APS_TLS_DIR binds read-only at /aps-tls into apache alone (empty: no bind, as upstream; the
+  # mastercontainer refuses a relative path). start.sh writes the file certificate and default_sni — a
+  # client by IP sends no SNI — only on 443 with both files readable, else upstream's ACME stanza, whole.
+  # The routes sit in a snippet both site blocks import: a file-certificate site cannot share a block with
+  # the plain :23973 address. The tls placeholder sits after the last import (the site block's own), the
+  # default_sni one before the snippet (the global options), and «auto_https» stays on one line: start.sh
+  # rewrites every line matching it.
+  local j="$TREE/php/containers.json" f="$TREE/php/src/ContainerDefinitionFetcher.php" \
+        m="$TREE/php/src/Data/ConfigurationManager.php" mc="$TREE/Containers/mastercontainer/start.sh" \
+        c="$TREE/Containers/apache/Caddyfile" s="$TREE/Containers/apache/start.sh" fail=0 nr ni nt ns
+  s3_files "$j" "$f" "$m" "$mc" "$c" "$s" || return 1
+  case "$(sed -n '/"container_name": "aps-conecta-apache"/,/"container_name": /p' "$j" | tr -d ' \n')" in
+    *'"source":"%APS_TLS_DIR%","destination":"/aps-tls","writeable":false'*) ;;
+    *) echo "  containers.json does not bind APS_TLS_DIR read-only at /aps-tls into apache" >&2; fail=1 ;;
+  esac
+  [ "$(grep -cF '"%APS_TLS_DIR%"' "$j")" -eq 1 ] || { echo "  APS_TLS_DIR is bound into another container too" >&2; fail=1; }
+  grep -A1 -F "} elseif (\$value['source'] === '%APS_TLS_DIR%') {" "$f" | grep -qF '$this->configurationManager->apsTlsDir;' \
+    || { echo "  ContainerDefinitionFetcher does not resolve %APS_TLS_DIR%" >&2; fail=1; }
+  grep -qF "get => \$this->getEnvironmentalVariableOrConfig('APS_TLS_DIR', 'aps_tls_dir', '');" "$m" \
+    || { echo "  ConfigurationManager does not read APS_TLS_DIR" >&2; fail=1; }
+  grep -qF 'if [ -n "$APS_TLS_DIR" ]; then' "$mc" || { echo "  the mastercontainer does not check APS_TLS_DIR" >&2; fail=1; }
+  nr="$(grep -nxF '(aps_routes) {' "$c" | cut -d: -f1)"
+  ni="$(grep -nxF '    import aps_routes' "$c" | tail -1 | cut -d: -f1)"
+  nt="$(grep -nxF '    # tls placeholder' "$c" | cut -d: -f1)"
+  ns="$(grep -nxF '    # default_sni placeholder' "$c" | cut -d: -f1)"
+  { [ "$(grep -cxF '    import aps_routes' "$c")" -eq 2 ] && [ -n "$nr" ]; } \
+    || { echo "  the Caddyfile's routes are not one snippet imported by both blocks" >&2; fail=1; }
+  { [ -n "$nt" ] && [ -n "$ni" ] && [ "$nt" -gt "$ni" ]; } \
+    || { echo "  the Caddyfile's tls placeholder is missing or outside the site block" >&2; fail=1; }
+  { [ -n "$ns" ] && [ -n "$nr" ] && [ "$ns" -lt "$nr" ]; } \
+    || { echo "  the Caddyfile's default_sni placeholder is missing or outside the global options" >&2; fail=1; }
+  [ "$(grep -c 'auto_https' "$c")" -eq 1 ] || { echo "  a second Caddyfile line names auto_https — start.sh would rewrite it" >&2; fail=1; }
+  if grep -nF 'issuer acme' "$c"; then echo "  the Caddyfile still hard-codes the ACME issuer" >&2; fail=1; fi
+  { grep -qF "if [ \"\$APACHE_PORT\" = '443' ] && [ -r /aps-tls/tls.crt ] && [ -r /aps-tls/tls.key ]; then" "$s" \
+      && grep -qF "TLS_STANZA='tls /aps-tls/tls.crt /aps-tls/tls.key'" "$s" \
+      && grep -qF 'DEFAULT_SNI="default_sni $NC_DOMAIN"' "$s" \
+      && grep -qF "TLS_STANZA='tls {\n\t\tissuer acme {\n\t\t\tprofile shortlived\n\t\t\tdisable_http_challenge\n\t\t}\n\t}'" "$s" \
+      && grep -qxF "    DEFAULT_SNI=''" "$s" \
+      && grep -qF -e '-e "s|# tls placeholder|$TLS_STANZA|" -e "s|# default_sni placeholder|$DEFAULT_SNI|"' "$s"; } \
+    || { echo "  apache's start.sh does not choose the certificate (the file on 443 with both files, else upstream's ACME stanza)" >&2; fail=1; }
+  [ "$fail" -eq 0 ]
+}
+
+row 235 "apache serves the installer's own certificate when one is mounted — APS_TLS_DIR bound read-only into apache alone, the file certificate and default_sni on 443 with both files, else upstream's ACME stanza; the routes one snippet (R22, declared PHP: the setting and its bind)" \
+  installer_certificate
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
