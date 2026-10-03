@@ -293,6 +293,18 @@ first_boot_quiet() {  # 220: a fresh install calls nothing it does not need (R28
 row 220 "a fresh install calls nothing it does not need — whiteboard's npm update check off, nextcloud_announcements disabled before its first cron (R28)" \
   first_boot_quiet
 
+circles_probe_skipped() {  # 230: the fresh install logs no «relation "oc_circle_circles" does not
+  # exist» (R31): circles' migration_22 is marked done between the install and the first repair,
+  # so the repair never probes the legacy table a fresh install does not have. The theming
+  # background job's one-shot error needs no patch: gestion's phase 15 stores the brand images,
+  # which creates appdata theming/global.
+  s4_files "$TREE/Containers/nextcloud/entrypoint.sh" || return 1
+  s4_install_block 'php /var/www/html/occ config:app:set circles migration_22 --value=1'
+}
+
+row 230 "the fresh install skips circles' legacy-table probe — migration_22 marked done between the install and the first repair (R31)" \
+  circles_probe_skipped
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1
