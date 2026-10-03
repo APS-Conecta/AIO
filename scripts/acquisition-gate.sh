@@ -261,6 +261,23 @@ office_is_euro_office() {  # 200: the suite's office is Euro-Office, and only Eu
 row 200 "the suite's office is Euro-Office only — any other office choice is refused before it is stored (422, Spanish), and the page offers no way to disable it (R25, D12 b)" \
   office_is_euro_office
 
+options_start_off() {  # 210: Talk, Whiteboard and Imaginary start off (R29, R27.5/7; D12 a) — the
+  # three PHP default literals Setup.php copies into a fresh config. Gestion's step 7 turns Talk on
+  # where the server's memory and cores allow; the translated suite's persisted-defaults spec
+  # expects the same three falses.
+  local m="$TREE/php/src/Data/ConfigurationManager.php" s="$TREE/php/tests/tests/persist-default-config.spec.js" fail=0 k
+  s4_files "$m" "$s" || return 1
+  for k in isTalkEnabled isWhiteboardEnabled isImaginaryEnabled; do
+    grep -qF "get => (bool) \$this->get('$k', false);" "$m" || { echo "  $k does not default to off" >&2; fail=1; }
+    if grep -nF "get('$k', true)" "$m"; then echo "  a $k getter still defaults on" >&2; fail=1; fi
+    grep -qF "$k: false," "$s" || { echo "  persist-default-config.spec.js does not expect $k off" >&2; fail=1; }
+  done
+  [ "$fail" -eq 0 ]
+}
+
+row 210 "Talk, Whiteboard and Imaginary start off — the three PHP defaults a fresh config copies, and the suite's spec expecting them (R29, D12 a)" \
+  options_start_off
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1

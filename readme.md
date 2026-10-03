@@ -35,11 +35,13 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 180 | the wizard laid out for a 360 px phone |
 | 190 | no community containers — the image ships none and the page has no section |
 | 200 | the office is Euro-Office only — other choices refused (PHP, declared) |
+| 210 | Talk, Whiteboard and Imaginary start off (PHP defaults, declared) |
 
 **PHP logic changes only where declared.** Every other modification is a string, an asset, a
 template, or Dockerfile plumbing, carried as a patch the CI replays and the gates verify. The
-declared PHP changes: patch 080's three registry references (strings) and patch 200's office
-guard (any office other than Euro-Office is refused).
+declared PHP changes: patch 080's three registry references (strings), patch 200's office guard
+(any office other than Euro-Office is refused), and patch 210's defaults (Talk, Whiteboard and
+Imaginary start off).
 
 **What the operator sees.** The wizard presents itself as «APS Conecta Gestión AIO — Instalador»;
 an already-installed instance greets with «APS Conecta Gestión AIO ya está instalado»; once the
