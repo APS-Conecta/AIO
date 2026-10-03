@@ -621,6 +621,29 @@ help_links_ours() {  # 140: every help link the wizard renders goes to the suite
 row 140 "every help link on the wizard goes to the suite's own docs or is gone — no upstream GitHub, Nextcloud site or App API URL, no per-container upstream documentation link, no Synology/macOS/Windows examples, each mapped gestion doc section linked (R23)" \
   help_links_ours
 
+aps_defaults() {  # 150: the wizard proposes the suite's own values (R24) — America/Santiago, the
+  # backup folder under /srv/aps-conecta (a value, so accepting the default is one click), a
+  # gestion domain pattern — and none of upstream's examples is left.
+  local t="$TREE/php/templates" fail=0 f s
+  s3_files "$t/containers.twig" "$t/includes/backup-dirs.twig" || return 1
+  while IFS='|' read -r f s; do
+    grep -qF "$s" "$t/$f" || { echo "  $f does not carry: $s" >&2; fail=1; }
+  done <<'EOF'
+containers.twig|placeholder="gestion.su-establecimiento.cl"
+containers.twig|id="borg_backup_host_location" name="borg_backup_host_location" value="/srv/aps-conecta/respaldos"
+containers.twig|<input type="text" id="timezone" name="timezone" value="America/Santiago" />
+containers.twig|placeholder="/opt/aps-conecta"
+includes/backup-dirs.twig|<strong>/srv/aps-conecta/respaldos</strong>
+EOF
+  if grep -rnE '/mnt/backup|Europe/Berlin|nextcloud\.yourdomain\.com|/directory/on/the/host|my_custom_docker_volume' "$t"; then
+    echo "  an upstream example survives in the wizard" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+row 150 "the wizard proposes the suite's values — America/Santiago, /srv/aps-conecta/respaldos, a gestion domain pattern — and no upstream example is left (R24)" \
+  aps_defaults
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
