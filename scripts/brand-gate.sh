@@ -731,7 +731,7 @@ row 180 "the wizard fits a 360px phone — the viewport declared, the login card
 container_names() {  # 240: the suite's 19 containers are aps-conecta-*, and no swept file names one the old
   # way. The keep-list is the generator's, restated here on purpose: a gate that imported it would agree
   # with any mistake in it.
-  local j="$TREE/php/containers.json" fail=0 n left
+  local j="$TREE/php/containers.json" fail=0 n left x
   [ -f "$j" ] || { echo "  no such file: $j" >&2; return 1; }
   if grep -nF '"container_name": "nextcloud-aio-' "$j"; then
     echo "  containers.json still names a container nextcloud-aio-*" >&2; fail=1
@@ -757,8 +757,9 @@ container_name_patterns() {  # 240: what matches containers by pattern follows t
   # entrypoint's office and Talk detection (a miss reads the suite's own host as external), the schema the
   # validator holds every JSON to, and the log route's three guards, which still let the wizard's own log in
   local e="$TREE/Containers/nextcloud/entrypoint.sh" sch="$TREE/php/containers-schema.json" fail=0 x
+  local run="$TREE/php/tests/run.sh"
   for x in "$e" "$sch" "$TREE/php/public/index.php" "$TREE/php/public/log-load.js" \
-           "$TREE/php/src/Controller/DockerController.php"; do
+           "$TREE/php/src/Controller/DockerController.php" "$run"; do
     [ -f "$x" ] || { echo "  no such file: $x — re-point this row" >&2; return 1; }
   done
   if grep -nF 'grep -q "nextcloud-.*-' "$e"; then
@@ -778,10 +779,13 @@ container_name_patterns() {  # 240: what matches containers by pattern follows t
     || { echo "  log-load.js does not take aps-conecta-* and the mastercontainer" >&2; fail=1; }
   grep -qF "if (str_starts_with(\$id, 'aps-conecta-') || \$id === 'nextcloud-aio-mastercontainer') {" "$TREE/php/src/Controller/DockerController.php" \
     || { echo "  DockerController's log route does not take aps-conecta-* and the mastercontainer" >&2; fail=1; }
+  { grep -qF 'nextcloud-aio-mastercontainer aps-conecta-{apache,' "$run" \
+      && grep -qF 'for container in nextcloud-aio-mastercontainer aps-conecta-borgbackup; do' "$run"; } \
+    || { echo "  the test harness's name lists (run.sh) do not name aps-conecta-* and the mastercontainer" >&2; fail=1; }
   [ "$fail" -eq 0 ]
 }
 
-row 240 'what matches containers by pattern follows the new names — the six entrypoint host checks, the two schema patterns, the three log-route guards (the mastercontainer still allowed)' \
+row 240 'what matches containers by pattern follows the new names — the six entrypoint host checks, the two schema patterns, the three log-route guards (the mastercontainer still allowed), both name lists in the test harness' \
   container_name_patterns
 
 if [ "$fails" -gt 0 ]; then

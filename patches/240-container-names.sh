@@ -11,6 +11,12 @@
 #
 # Fresh installs only. An instance installed with nextcloud-aio-* siblings keeps them; it is reinstalled,
 # never migrated (gestion's INSTALLER.md §12).
+#
+# Only the mastercontainer and aio-nextcloud are built from this tree; the other siblings run upstream's
+# images, retagged, which learn their peers' names from the *_HOST values the PHP sets. One does not:
+# docker-socket-proxy's image resolves nextcloud-aio-nextcloud itself (its Dockerfile ENV and start.sh),
+# so under these names it would wait forever. It cannot run on a fresh install — upstream deprecated it,
+# and ConfigurationManager's setter only ever moves it towards off.
 set -euo pipefail
 
 exec python3 "${APS_TOOLS_ROOT:?APS_TOOLS_ROOT must name the main checkout carrying scripts/ (scripts/replay.sh sets it)}/scripts/rename-containers.py"

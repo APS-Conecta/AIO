@@ -138,8 +138,9 @@ def swept_files():
                 continue  # docs, not runtime: upstream's prose and examples
             try:
                 yield f, f.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                continue  # binaries (icons, fonts) name no container
+            except UnicodeDecodeError:  # binaries (icons, fonts): skipped, so none may name a container
+                if OLD.encode() in f.read_bytes():
+                    die(f"{f} is not UTF-8 yet carries «{OLD}» — the sweep cannot rewrite it; fix the generator")
 
 
 def main():
