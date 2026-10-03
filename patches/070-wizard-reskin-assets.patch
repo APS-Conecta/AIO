@@ -5145,7 +5145,7 @@ index 14430059..a2cf3a9e 100644
                              {% if isAnyRestarting == false %}
                                  <p><span class="status running"></span> Los contenedores se están iniciando actualmente. Puede inspeccionar los registros de los contenedores haciendo clic en <strong>Iniciando</strong>, junto a cada contenedor, para obtener más detalles.</p>
 diff --git a/php/templates/layout.twig b/php/templates/layout.twig
-index 0387e41b..dee00424 100644
+index 0387e41b..07dfcffa 100644
 --- a/php/templates/layout.twig
 +++ b/php/templates/layout.twig
 @@ -1,11 +1,10 @@
@@ -5153,9 +5153,10 @@ index 0387e41b..dee00424 100644
  <html lang="es">
      <head>
 -        <title>AIO</title>
-+        <title>APS Conecta AIO — Instalador</title>
-         <link rel="stylesheet" href="style.css?v14" media="all" />
+-        <link rel="stylesheet" href="style.css?v14" media="all" />
 -        <link rel="icon" href="img/favicon.png">
++        <title>APS Conecta AIO — Instalador</title>
++        <link rel="stylesheet" href="style.css?v15" media="all" />
 +        <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
          <script type="text/javascript" src="forms.js?v2"></script>
 -        <script type="text/javascript" src="toggle-dark-mode.js?v2"></script>
@@ -5172,7 +5173,7 @@ index 0387e41b..dee00424 100644
      </body>
  </html>
 diff --git a/php/templates/log.twig b/php/templates/log.twig
-index d756f506..ddb234d5 100644
+index d756f506..a0844f33 100644
 --- a/php/templates/log.twig
 +++ b/php/templates/log.twig
 @@ -1,10 +1,10 @@
@@ -5181,7 +5182,8 @@ index d756f506..ddb234d5 100644
 -        <title>AIO</title>
 +        <title>APS Conecta AIO — Instalador</title>
          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-         <link rel="stylesheet" href="style.css?v14">
+-        <link rel="stylesheet" href="style.css?v14">
++        <link rel="stylesheet" href="style.css?v15">
          <link rel="stylesheet" href="logs.css?v1">
 -        <link rel="icon" href="img/favicon.png">
 +        <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
