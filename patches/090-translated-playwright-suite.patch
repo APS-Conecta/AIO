@@ -56,7 +56,7 @@ index c7092921..5c993018 100644
          if: ${{ !cancelled() }}
          with:
 diff --git a/php/tests/compose.yaml b/php/tests/compose.yaml
-index 740c6fe9..078a81b6 100644
+index 7003bc9c..5062bfa7 100644
 --- a/php/tests/compose.yaml
 +++ b/php/tests/compose.yaml
 @@ -20,7 +20,7 @@ services:
@@ -82,14 +82,14 @@ index 740c6fe9..078a81b6 100644
        - local-code
  
 -  desec-mock:
--    image: docker.io/library/node:26@sha256:fa271c47a5d81dc321f4a45be01362f5b3de7559edc7e76b8c4089be1e50d866
+-    image: docker.io/library/node:26@sha256:a723b54c35a76e947095a20a67d39585bb09c862e6b1adeb8a9f518f95e34fb0
 -    volumes:
 -      - ..:/app/php
 -    working_dir: /app
 -    command: node php/tests/desec-mock.mjs 8090 2>&1
 -          
    npm-installer:
-     image: docker.io/library/node:26@sha256:fa271c47a5d81dc321f4a45be01362f5b3de7559edc7e76b8c4089be1e50d866
+     image: docker.io/library/node:26@sha256:a723b54c35a76e947095a20a67d39585bb09c862e6b1adeb8a9f518f95e34fb0
      volumes:
 @@ -83,15 +74,12 @@ services:
      profiles:
@@ -502,10 +502,10 @@ index 762012d2..00000000
 -  ).toHaveCount(0);
 -});
 diff --git a/php/tests/tests/helpers.js b/php/tests/tests/helpers.js
-index 1246dad7..e2c8fcd9 100644
+index 212ff569..233a0977 100644
 --- a/php/tests/tests/helpers.js
 +++ b/php/tests/tests/helpers.js
-@@ -1,24 +1,21 @@
+@@ -1,20 +1,17 @@
 -// Shared helpers for the deSEC Playwright scenarios.
 +// Shared login flow for the wizard's Playwright scenarios (the fork's es-CL suite, patch 090).
  //
@@ -513,12 +513,14 @@ index 1246dad7..e2c8fcd9 100644
 -// which makes AIO consider itself already installed: /setup no longer renders the
 -// initial-password page. The seed step therefore writes a known master password (AIO_TEST_PASSWORD)
 -// that we log in with directly here instead of scraping it from /setup.
--
--export const DESEC_MOCK_URL = process.env.DESEC_MOCK_URL ?? 'http://localhost:8090';
 +// ./setup renders the one-time passphrase page while the instance is not installed; we scrape
 +// the passphrase, open the login in the popup (the setup link keeps target="_blank"), and log
 +// in there — the containers page is the popup, the setup page stays behind it.
  
+ import { expect } from '@playwright/test';
+ 
+-export const DESEC_MOCK_URL = process.env.DESEC_MOCK_URL ?? 'http://localhost:8090';
+-
  export async function logInToContainersPage(setupPage) {
    // Extract initial password
    await setupPage.goto('./setup');
@@ -528,16 +530,24 @@ index 1246dad7..e2c8fcd9 100644
 +  await setupPage.getByRole('link', { name: 'Abrir el inicio de sesión de Nextcloud AIO ↗' }).click();
    const containersPage = await containersPagePromise;
  
+   // Typing must not reveal the passphrase; only the reveal button toggles it
+@@ -22,13 +19,13 @@ export async function logInToContainersPage(setupPage) {
+   await passwordField.click();
+   await passwordField.fill(password);
+   await expect(passwordField).toHaveAttribute('type', 'password');
+-  await containersPage.getByRole('button', { name: 'Show passphrase' }).click();
++  await containersPage.getByRole('button', { name: 'Mostrar frase de contraseña' }).click();
+   await expect(passwordField).toHaveAttribute('type', 'text');
+-  await containersPage.getByRole('button', { name: 'Hide passphrase' }).click();
++  await containersPage.getByRole('button', { name: 'Ocultar frase de contraseña' }).click();
+   await expect(passwordField).toHaveAttribute('type', 'password');
+ 
    // Log in and wait for redirect
-   await containersPage.locator('#master-password').click();
-   await containersPage.locator('#master-password').fill(password);
 -  await containersPage.getByRole('button', { name: 'Log in' }).click();
 +  await containersPage.getByRole('button', { name: 'Iniciar sesión' }).click();
    await containersPage.waitForURL('./containers');
    return containersPage;
--}
-+}
-\ No newline at end of file
+ }
 diff --git a/php/tests/tests/initial-setup.spec.js b/php/tests/tests/initial-setup.spec.js
 index b766878c..b1d6f03f 100755
 --- a/php/tests/tests/initial-setup.spec.js

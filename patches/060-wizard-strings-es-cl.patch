@@ -12,6 +12,28 @@ index 00000000..f198f0ba
 +# it necessarily contains the flagged words as list entries.
 +skip = .codespellrc
 +ignore-words-list = accesible,caracteres,comando,comandos,componentes,doble,funcional,hace,inicial,momento,oficial,posible,requiere,ser,termine,utiliza
+diff --git a/php/public/click-handlers.js b/php/public/click-handlers.js
+index cd88402a..13ec060c 100644
+--- a/php/public/click-handlers.js
++++ b/php/public/click-handlers.js
+@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
+         const toggle = document.createElement('button');
+         toggle.type = 'button';
+         toggle.className = 'password-toggle';
+-        toggle.setAttribute('aria-label', 'Show passphrase');
++        toggle.setAttribute('aria-label', 'Mostrar frase de contraseña');
+         toggle.setAttribute('aria-pressed', 'false');
+         if (passwordField.id) {
+             toggle.setAttribute('aria-controls', passwordField.id);
+@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
+             const reveal = passwordField.type === 'password';
+             passwordField.type = reveal ? 'text' : 'password';
+             toggle.setAttribute('aria-pressed', String(reveal));
+-            toggle.setAttribute('aria-label', reveal ? 'Hide passphrase' : 'Show passphrase');
++            toggle.setAttribute('aria-label', reveal ? 'Ocultar frase de contraseña' : 'Mostrar frase de contraseña');
+         });
+         wrapper.appendChild(toggle);
+     });
 diff --git a/php/public/containers-form-submit.js b/php/public/containers-form-submit.js
 index f6e5c447..bdbd7981 100644
 --- a/php/public/containers-form-submit.js
@@ -169,7 +191,7 @@ index e684e7e7..a97fe4e5 100644
      </details>
    {% endif %}
 diff --git a/php/templates/containers.twig b/php/templates/containers.twig
-index ea0bc9aa..dc7dd73c 100644
+index 4936133f..14430059 100644
 --- a/php/templates/containers.twig
 +++ b/php/templates/containers.twig
 @@ -11,7 +11,7 @@
@@ -524,9 +546,9 @@ index ea0bc9aa..dc7dd73c 100644
                              {% endif %}
                                  {% if was_start_button_clicked == false %}
                                      <form method="POST" action="api/docker/start" target="overlay-log">
-@@ -334,9 +334,9 @@
-                                         <input type="hidden" name="{{csrf.keys.value}}" value="{{csrf.value}}">
-                                         <input id="base_path" type="hidden" name="base_path" value="">
+@@ -337,9 +337,9 @@
+                                             <input type="hidden" name="bypass_container_update" value="true">
+                                         {% endif %}
                                          {% if newMajorVersionString != '' %}
 -                                            <input type="checkbox" id="install_latest_major" name="install_latest_major"><label for="install_latest_major">Install Nextcloud Hub {{ newMajorVersionString }} (if unchecked, Nextcloud Hub {{ oldMajorVersionString }} will get installed)</label><br>
 +                                            <input type="checkbox" id="install_latest_major" name="install_latest_major"><label for="install_latest_major">Instalar Nextcloud Hub {{ newMajorVersionString }} (si no se marca, se instalará Nextcloud Hub {{ oldMajorVersionString }})</label><br>
@@ -536,7 +558,7 @@ index ea0bc9aa..dc7dd73c 100644
                                      </form>
                                  {% elseif has_update_available == false %}
                                      <form method="POST" action="api/docker/start" target="overlay-log">
-@@ -346,7 +346,7 @@
+@@ -349,7 +349,7 @@
                                          {% if bypass_container_update == true %}
                                              <input type="hidden" name="bypass_container_update" value="true">
                                          {% endif %}
@@ -545,7 +567,7 @@ index ea0bc9aa..dc7dd73c 100644
                                      </form>
                                  {% else %}
                                      <form method="POST" action="api/docker/start" target="overlay-log">
-@@ -356,7 +356,7 @@
+@@ -359,7 +359,7 @@
                                          {% if bypass_container_update == true %}
                                              <input type="hidden" name="bypass_container_update" value="true">
                                          {% endif %}
@@ -554,7 +576,7 @@ index ea0bc9aa..dc7dd73c 100644
                                      </form>
                                  {% endif %}
                          {% endif %}
-@@ -365,23 +365,23 @@
+@@ -368,23 +368,23 @@
                      {% if was_start_button_clicked == true %}
  
                          {% if is_backup_section_enabled == false %}
@@ -588,7 +610,7 @@ index ea0bc9aa..dc7dd73c 100644
                                  </form>
                                  {{ include('includes/backup-dirs.twig') }}
                              {% endif %}
-@@ -391,45 +391,45 @@
+@@ -394,45 +394,45 @@
  
                              {% if hasBackupLocation %}
                                  {% if is_backup_container_running == false %}
@@ -649,7 +671,7 @@ index ea0bc9aa..dc7dd73c 100644
                                          {% endif %}
                                      {% endif %}
                                  {% endif %}
-@@ -437,53 +437,53 @@
+@@ -440,53 +440,53 @@
                                  {% if is_backup_container_running == false and isApacheStarting == false %}
                                      {% if has_backup_run_once == true %}
                                          <details>
@@ -727,7 +749,7 @@ index ea0bc9aa..dc7dd73c 100644
                                              <form method="POST" action="api/docker/restore" target="overlay-log" id="restore_selection">
                                                  <input type="hidden" name="{{csrf.keys.name}}" value="{{csrf.name}}">
                                                  <input type="hidden" name="{{csrf.keys.value}}" value="{{csrf.value}}">
-@@ -492,73 +492,73 @@
+@@ -495,73 +495,73 @@
                                                          <option value="{{ restore_time }}">{{ restore_time }} UTC</option>
                                                      {% endfor %}
                                                  </select>
@@ -827,7 +849,7 @@ index ea0bc9aa..dc7dd73c 100644
                                          </form>
                                      {% endif %}
                                      {% if has_backup_run_once == true %}
-@@ -571,29 +571,29 @@
+@@ -574,29 +574,29 @@
                          {% if is_backup_container_running == false %}
                              {% if isApacheStarting == false %}
                                  {% if isAnyRunning == true %}
@@ -868,7 +890,7 @@ index ea0bc9aa..dc7dd73c 100644
                                  </details>
                              {% endif %}
                          {% endif %}
-@@ -602,30 +602,30 @@
+@@ -605,30 +605,30 @@
  
                          {{ include('includes/optional-containers.twig') }}
  
@@ -1190,7 +1212,7 @@ index 007577cf..f444dbd0 100644
      <script type="text/javascript" src="disable-containers.js?v1"></script>
  {% endif %}
 diff --git a/php/templates/layout.twig b/php/templates/layout.twig
-index 5e70ded8..b22abceb 100644
+index f6affa35..0387e41b 100644
 --- a/php/templates/layout.twig
 +++ b/php/templates/layout.twig
 @@ -1,5 +1,5 @@
@@ -1199,9 +1221,9 @@ index 5e70ded8..b22abceb 100644
 +<html lang="es">
      <head>
          <title>AIO</title>
-         <link rel="stylesheet" href="style.css?v13" media="all" />
+         <link rel="stylesheet" href="style.css?v14" media="all" />
 diff --git a/php/templates/log.twig b/php/templates/log.twig
-index ea36ab5c..246e702b 100644
+index 7a9c08ba..d756f506 100644
 --- a/php/templates/log.twig
 +++ b/php/templates/log.twig
 @@ -1,4 +1,4 @@
