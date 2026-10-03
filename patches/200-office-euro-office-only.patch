@@ -1,0 +1,71 @@
+diff --git a/php/src/Controller/ConfigurationController.php b/php/src/Controller/ConfigurationController.php
+index f96c8723..7aace71a 100644
+--- a/php/src/Controller/ConfigurationController.php
++++ b/php/src/Controller/ConfigurationController.php
+@@ -80,6 +80,10 @@ readonly class ConfigurationController {
+                 if (isset($request->getParsedBody()['office_suite_choice'])) {
+                     $inputValue = strval($request->getParsedBody()['office_suite_choice'] ?? '');
+                     $officeSuite = OfficeSuite::tryFrom($inputValue) ?? OfficeSuite::None;
++                    // APS (D12 b): the suite's office is Euro-Office; switching or disabling it is refused.
++                    if ($officeSuite !== OfficeSuite::Eurooffice) {
++                        throw new InvalidSettingConfigurationException('La oficina de la suite es Euro-Office: no se puede cambiar ni desactivar.');
++                    }
+                     $this->configurationManager->officeSuite = $officeSuite;
+                 }
+                 $this->configurationManager->isClamavEnabled = isset($request->getParsedBody()['clamav']);
+diff --git a/php/templates/includes/optional-containers.twig b/php/templates/includes/optional-containers.twig
+index 77401064..1520757b 100644
+--- a/php/templates/includes/optional-containers.twig
++++ b/php/templates/includes/optional-containers.twig
+@@ -11,7 +11,7 @@
+     <input type="hidden" name="options-form" value="options-form">
+     <h3>Suite de oficina</h3>
+     {% if isAnyRunning == false %}
+-        <p>Elija su suite de oficina preferida. Solo se puede activar una a la vez.</p>
++        <p>La oficina de la suite es Euro-Office.</p>
+     {% endif %}
+     <div class="office-suite-cards">
+         <input
+@@ -47,24 +47,6 @@
+             {% endif %}
+         </label>
+     </div>
+-    {% if isAnyRunning == false %}
+-        <div class="office-none-card">
+-            <input
+-                type="radio"
+-                id="office-none"
+-                name="office_suite_choice"
+-                value=""
+-                class="office-radio"
+-                {% if office_suite == '' %}
+-                    checked="checked"
+-                {% endif %}
+-            >
+-            <label class="office-none-label" for="office-none">
+-                <img src="img/office-none.svg" alt="Icono de desactivar oficina" />
+-                Desactivar suite de oficina
+-            </label>
+-        </div>
+-    {% endif %}
+     <input type="hidden" id="initial-office-suite" value="{{ office_suite }}">
+     <input class="options-form-submit" type="submit" value="Guardar cambios" />
+     <h3>Contenedores opcionales adicionales</h3>
+diff --git a/php/tests/tests/initial-setup.spec.js b/php/tests/tests/initial-setup.spec.js
+index ea3ac2b4..5ac0ab73 100755
+--- a/php/tests/tests/initial-setup.spec.js
++++ b/php/tests/tests/initial-setup.spec.js
+@@ -28,12 +28,11 @@ test('Initial setup', async ({ page: setupPage }) => {
+   await containersPage.locator('#talk').uncheck();
+   await containersPage.getByRole('checkbox', { name: 'Whiteboard' }).uncheck();
+   await containersPage.getByRole('checkbox', { name: 'Imaginary' }).uncheck();
+-  await containersPage.getByText('Desactivar suite de oficina').click();
+   await containersPage.getByRole('button', { name: 'Guardar cambios' }).last().click();
+   await expect(containersPage.locator('#talk')).not.toBeChecked()
+   await expect(containersPage.getByRole('checkbox', { name: 'Whiteboard' })).not.toBeChecked()
+   await expect(containersPage.getByRole('checkbox', { name: 'Imaginary' })).not.toBeChecked()
+-  await expect(containersPage.locator('#office-none')).toBeChecked()
++  await expect(containersPage.locator('#office-eurooffice')).toBeChecked()
+ 
+   // Reject invalid time zones (PHP-borne English: ConfigurationManager.php:1037 — stays, zero-PHP)
+   await containersPage.locator('#timezone').click();

@@ -232,6 +232,35 @@ community_channel_closed() {  # 190: the image ships no community container (R25
 row 190 "the image ships no community container — an empty directory instead of upstream's set, no community section or template, no community restore note, the options script tolerant of the absent form (R25)" \
   community_channel_closed
 
+# shellcheck disable=SC2016  # the patterns are literal PHP — their $ is not a shell expansion
+office_is_euro_office() {  # 200: the suite's office is Euro-Office, and only Euro-Office (R25, D12 b).
+  # The options form refuses any other office_suite_choice — the one PHP guard, its throw on the
+  # line after the test, both before the setter — with a 422 and a Spanish message, and the page
+  # no longer offers «Desactivar suite de oficina». Setup's first-boot copy of the default
+  # (Setup.php:28) never passes through the controller, so the guard cannot refuse the suite's own
+  # default; gestion's drive never posts an office choice.
+  local k="$TREE/php/src/Controller/ConfigurationController.php" \
+        o="$TREE/php/templates/includes/optional-containers.twig" s="$TREE/php/tests/tests/initial-setup.spec.js" fail=0 g w
+  s4_files "$k" "$o" "$s" || return 1
+  g="$(grep -nF 'if ($officeSuite !== OfficeSuite::Eurooffice) {' "$k" | head -1 | cut -d: -f1)"
+  w="$(grep -nF '$this->configurationManager->officeSuite = $officeSuite;' "$k" | head -1 | cut -d: -f1)"
+  if [ -z "$g" ] || [ -z "$w" ] || [ "$g" -ge "$w" ]; then
+    echo "  ConfigurationController stores an office choice without refusing a non-Euro-Office one first" >&2; fail=1
+  fi
+  grep -A1 -F 'if ($officeSuite !== OfficeSuite::Eurooffice) {' "$k" \
+    | grep -qF "throw new InvalidSettingConfigurationException('La oficina de la suite es Euro-Office: no se puede cambiar ni desactivar.');" \
+    || { echo "  the refusal does not throw its Spanish message inside the guard" >&2; fail=1; }
+  if grep -n 'office-none' "$o"; then echo "  the page still offers to disable the office suite" >&2; fail=1; fi
+  grep -qF 'id="office-eurooffice"' "$o" || { echo "  the Euro-Office card is gone (the guard's positive control)" >&2; fail=1; }
+  if grep -nE "Desactivar suite de oficina|#office-none" "$s"; then
+    echo "  initial-setup.spec.js still disables the office suite" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+row 200 "the suite's office is Euro-Office only — any other office choice is refused before it is stored (422, Spanish), and the page offers no way to disable it (R25, D12 b)" \
+  office_is_euro_office
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1

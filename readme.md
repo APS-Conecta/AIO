@@ -31,13 +31,15 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 140 | the wizard's help links pointed at the suite's own docs (gestion's INSTALLER and GUIA-CLINICA), the rest removed |
 | 150 | the suite's values pre-filled — America/Santiago, `/srv/aps-conecta/respaldos`, a gestion domain pattern |
 | 160 | the page offers only what the suite ships — the baked Hub, the suite version, the office card, no ExApp proxies, no «mastercontainer» jargon |
-| 170 | the post-start page: the update path, «Suite en marcha», no Docker prune button (the route stays — zero PHP), the suite's names |
+| 170 | the post-start page: the update path, «Suite en marcha», no Docker prune button (the route stays), the suite's names |
 | 180 | the wizard laid out for a 360 px phone |
 | 190 | no community containers — the image ships none and the page has no section |
+| 200 | the office is Euro-Office only — other choices refused (PHP, declared) |
 
-**No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
-an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates
-verify; the sole PHP-side string changes are patch 080's three registry references.
+**PHP logic changes only where declared.** Every other modification is a string, an asset, a
+template, or Dockerfile plumbing, carried as a patch the CI replays and the gates verify. The
+declared PHP changes: patch 080's three registry references (strings) and patch 200's office
+guard (any office other than Euro-Office is refused).
 
 **What the operator sees.** The wizard presents itself as «APS Conecta Gestión AIO — Instalador»;
 an already-installed instance greets with «APS Conecta Gestión AIO ya está instalado»; once the
@@ -45,7 +47,7 @@ containers run, the page hands back to the web installer with «Suite en marcha�
 — the brand gate proves them equal to this declaration on every replay.
 
 **Why some messages remain in English.** The wizard renders 68 operator-visible messages from
-PHP code the fork never touches (the zero-PHP rule). They stay English by scope decision, and
+PHP code the fork does not translate (its declared PHP changes are behaviour, not strings). They stay English by scope decision, and
 this is the complete list, by source:
 
 | Source | Count | Where | Examples |
