@@ -355,25 +355,17 @@ EOF
   [ "$fail" -eq 0 ]
 }
 
-paso1_card() {  # the handoff card shows the aps-conecta provision command — never a literal
-  # URL or port (the locked dynamic-bind decision: the Provisionador prints its own address
-  # at bind time). containers.twig carried no :808x before this patch, so a literal port can
-  # only arrive with the card — the absence check is the card's own scope.
+paso1_card() {  # the handoff card is present — and never a literal URL or port (the locked
+  # dynamic-bind decision: the web installer prints its own address at bind time).
+  # containers.twig carried no :808x before this patch, so a literal port can only arrive
+  # with the card — the absence check is the card's own scope. AMENDED WITH L4 S3: the card's
+  # words are 170's («Suite en marcha», `sudo aps-conecta abrir`), so this row keeps the two
+  # things 070 still owns — the card and the no-port rule.
   local t="$TREE/php/templates/containers.twig"
   grep -qF 'id="paso-1-card"' "$t" || { echo "  the Paso-1 handoff card is missing" >&2; return 1; }
-  grep -qF '<code>aps-conecta provision</code>' "$t" || { echo "  the card must show the aps-conecta provision command" >&2; return 1; }
   if grep -nE ':808[0-9]' "$t"; then
     echo "  a literal provisioner port leaked into containers.twig — the card must show the command only" >&2; return 1
   fi
-}
-
-territorio_pending_card() {  # the S12 gate's operator contract, made mechanical: the card is
-  # visible until territorio ships, and removing it without touching this row reds the gate
-  # — the flip can only ever be deliberate (the drift-protection the card needs, since it
-  # is the one piece of shipped markup whose designed lifetime is bounded).
-  local t="$TREE/php/templates/containers.twig"
-  grep -qF 'id="territorio-card"' "$t" || { echo "  the territorio pending card is missing" >&2; return 1; }
-  grep -qF 'pendiente de empaquetado' "$t" || { echo "  the pending-state wording is missing" >&2; return 1; }
 }
 
 
@@ -392,11 +384,8 @@ row 070 "the wizard's assets are the fork's — logo.svg (id=\"logo\" + id=\"wor
 row 070 "the token table carries the brand values — primary #7f21fe, ink #101828, muted #485363, error #ea003e, gold running dot; Fraunces and Nunito Sans ship as local subsets with zero remote font URLs" \
   reskin_tokens
 
-row 070 "the Paso-1 handoff card shows the aps-conecta provision command — present, and no literal provisioner port anywhere in containers.twig" \
+row 070 "the handoff card is present — and no literal provisioner port anywhere in containers.twig (170 owns its words)" \
   paso1_card
-
-row 070 "the territorio pending card is visible — the S12 gate's operator contract until the tarball ships" \
-  territorio_pending_card
 
 whitelabel_buildtime() {  # bake.sh carries BOTH served-file asserts the office smoke owned — the
   # rename is enforced where the bytes are made, because the renamed files ship inside the
@@ -423,7 +412,7 @@ suite_escl_present() {  # TREE — the translated suite's positive control: one 
   done <<'EOF'
 php/tests/tests/helpers.js|Abrir el inicio de sesión de
 php/tests/tests/initial-setup.spec.js|Enviar dominio
-php/tests/tests/initial-setup.spec.js|Contraseña inicial de Nextcloud:
+php/tests/tests/initial-setup.spec.js|Los contenedores se están iniciando
 php/tests/tests/restore-instance.spec.js|¡El último restore fue exitoso!
 php/tests/tests/restore-instance.spec.js|Enviar ubicación y contraseña de cifrado
 EOF
@@ -503,7 +492,7 @@ readme_twig_equal() {  # the fork declaration (main's readme.md) quotes the wiza
 APS Conecta Gestión AIO — Instalador|php/templates/layout.twig
 APS Conecta Gestión AIO — Instalador|php/templates/log.twig
 APS Conecta Gestión AIO ya está instalado|php/templates/already-installed.twig
-pendiente de empaquetado|php/templates/containers.twig
+Suite en marcha|php/templates/containers.twig
 Please enter a domain and not an IP-address!|php/src/Data/ConfigurationManager.php
 The entered timezone does not seem to be a valid timezone!|php/src/Data/ConfigurationManager.php
 EOF
@@ -548,8 +537,8 @@ lockup_outlines() {  # 120: the banner lockup's wordmark is outlines. A <use> cl
 product_name() {  # 130: «APS Conecta Gestión AIO» on every operator surface (R19). The identity
   # strings, the APS sentence, the buttons and the logo fallback present, the suite's own login
   # link asserted by the test helper, and no «APS Conecta
-  # AIO», «Nextcloud AIO» or «All-in-One» left in any text file the wizard serves or renders. The suite inside is still
-  # Nextcloud — «su Nextcloud» stays (the declaration's nominative use).
+  # AIO», «Nextcloud AIO» or «All-in-One» left in any text file the wizard serves or renders. Row 170 owns the
+  # suite's naming in the page's prose.
   local f s fail=0
   while IFS='|' read -r f s; do
     grep -qF "$s" "$TREE/$f" || { echo "  $f does not carry: $s" >&2; fail=1; }
@@ -670,6 +659,48 @@ page_choices() {  # 160: the page offers only what the suite ships (R25, its tem
 
 row 160 "the page offers only what the suite ships — no Hub major-version choice, the suite version in the heading, the office card titled Oficina, the docker socket proxy and HaRP hidden, no mastercontainer jargon (R25, its template part)" \
   page_choices
+
+post_start_page() {  # 170: after start the page says only true, APS things (R27): the suite's
+  # update path instead of the no-channel alarm (a pinned suite tag IS the design), «Suite en
+  # marcha» naming what the web installer does next instead of the Paso-1 and territorio cards,
+  # no docker prune button (the route stays — zero PHP), and the suite's names on the
+  # credentials, the open button, the container list and the page's prose — with the translated
+  # suite asserting the bytes it clicks. «Nextcloud» stays only where the page hides it: the
+  # Hub-upgrade block (160 empties its switch), the docker socket proxy and HaRP options and the
+  # JS alert behind them (160 hides them), and the community-containers section (S4's).
+  local c="$TREE/php/templates/containers.twig" j="$TREE/php/containers.json" s="$TREE/php/tests/tests" fail=0 want
+  s3_files "$c" "$j" "$s/initial-setup.spec.js" "$s/restore-instance.spec.js" || return 1
+  while IFS= read -r want; do
+    grep -qF "$want" "$c" || { echo "  containers.twig does not carry: $want" >&2; fail=1; }
+  done <<'EOF'
+https://github.com/APS-Conecta/gestion/blob/main/docs/GUIA-CLINICA.md#7-tras-actualizar
+<h2>Suite en marcha</h2>
+<code>sudo aps-conecta abrir</code>
+<p>Contraseña inicial de APS Conecta Gestión: <strong id="initial-nextcloud-password">
+>Abrir APS Conecta Gestión ↗</a>
+EOF
+  if grep -nE 'No se encontró ningún canal|territorio-card|pendiente de empaquetado|aps-conecta provision' "$c"; then
+    echo "  a false or stale statement survives on the post-start page" >&2; fail=1
+  fi
+  if grep -rn 'Nextcloud' "$TREE/php/templates" "$TREE/php/public"/*.js \
+      | grep -v -e '{#' -e 'Nextcloud Hub' -e 'Nextcloud App API' -e 'ExApps de Nextcloud' -e '/includes/community-containers.twig:'; then
+    echo "  «Nextcloud» survives in the wizard's prose" >&2; fail=1
+  fi
+  if grep -rn 'api/docker/prune' "$TREE/php/templates"; then echo "  the docker prune button is still offered" >&2; fail=1; fi
+  grep -qF "name: 'Abrir APS Conecta Gestión ↗'" "$s/initial-setup.spec.js" || { echo "  initial-setup.spec.js clicks a button the page no longer has" >&2; fail=1; }
+  grep -qF "name: 'Abrir APS Conecta Gestión ↗'" "$s/restore-instance.spec.js" || { echo "  restore-instance.spec.js clicks a button the page no longer has" >&2; fail=1; }
+  grep -qF "Contraseña inicial de APS Conecta Gestión:" "$s/initial-setup.spec.js" || { echo "  initial-setup.spec.js waits for a label the page no longer has" >&2; fail=1; }
+  for want in 'Servidor de aplicaciones' Talk 'Grabador de Talk' Euro-Office Whiteboard; do
+    grep -qF "\"display_name\": \"$want\"" "$j" || { echo "  containers.json lacks the display name $want" >&2; fail=1; }
+  done
+  if grep -nE '"display_name": "(Nextcloud|EuroOffice|Nextcloud Talk|Nextcloud Talk Recording|Nextcloud Whiteboard)"' "$j"; then
+    echo "  an upstream container name survives in the list" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+row 170 "the post-start page says only true, APS things — the update path, «Suite en marcha», no territorio card, no docker prune button, the suite's names on the credentials, the open button, the container list and the prose, and the suite asserting the same bytes (R27)" \
+  post_start_page
 
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2

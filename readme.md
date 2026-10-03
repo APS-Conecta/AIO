@@ -31,14 +31,15 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 140 | the wizard's help links pointed at the suite's own docs (gestion's INSTALLER and GUIA-CLINICA), the rest removed |
 | 150 | the suite's values pre-filled — America/Santiago, `/srv/aps-conecta/respaldos`, a gestion domain pattern |
 | 160 | the page offers only what the suite ships — the baked Hub, the suite version, the office card, no ExApp proxies, no «mastercontainer» jargon |
+| 170 | the post-start page: the update path, «Suite en marcha», no Docker prune button (the route stays — zero PHP), the suite's names |
 
 **No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
 an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates
 verify; the sole PHP-side string changes are patch 080's three registry references.
 
 **What the operator sees.** The wizard presents itself as «APS Conecta Gestión AIO — Instalador»;
-an already-installed instance greets with «APS Conecta Gestión AIO ya está instalado»; the territorio
-app's card reads «pendiente de empaquetado» until that app ships. These are the shipped bytes
+an already-installed instance greets with «APS Conecta Gestión AIO ya está instalado»; once the
+containers run, the page hands back to the web installer with «Suite en marcha». These are the shipped bytes
 — the brand gate proves them equal to this declaration on every replay.
 
 **Why some messages remain in English.** The wizard renders 68 operator-visible messages from
@@ -57,8 +58,10 @@ this is the complete list, by source:
 The translated Playwright suite (`php/tests`, patch 090) keeps English assertions on three of
 these as its own canary that the sweep never bled into PHP.
 
-**Nominative use.** The wizard names itself «APS Conecta Gestión AIO»; translated prose keeps
-«Nextcloud» where the sentence is about the software inside the suite («su Nextcloud»), and the
+**Nominative use.** The wizard names itself «APS Conecta Gestión AIO»; translated prose calls the
+software inside it «la suite» — «Nextcloud» remains only on the surfaces the page hides (the
+Hub-upgrade block, the docker socket proxy and HaRP options, the community-containers section)
+and in the PHP-borne messages listed above — and the
 wizard's help links point at the suite's own docs — gestion's `docs/INSTALLER.md` and
 `docs/GUIA-CLINICA.md`. The image labels are byte-identical upstream,
 deliberately, and both readings are recorded: `org.opencontainers.image.vendor` says
