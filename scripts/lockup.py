@@ -5,25 +5,32 @@ Why paths: the templates draw the lockup by <use href="img/logo.svg#wordmark">. 
 not carry the external SVG's own @font-face, so live <text> falls back to whatever the page can
 load (FINDINGS R20). Outlines need no font at all.
 
-Authoring tool, run by hand when the lockup's words or the brand fonts change (OSS: fontTools).
-The fonts are gestion's full variable brand fonts — the wizard ships only subsets:
+Authoring tool, run by hand when the lockup's words or the brand fonts change. OSS: HarfBuzz shapes
+each line the way a browser would (kerning, and Fraunces' WONK substitutions such as n → n.alt);
+fontTools draws the shaped glyphs from the variable font pinned at the same axes. It runs on the
+070 logo or on its own earlier output. The fonts are gestion's full variable brand fonts — the
+wizard ships only subsets:
 
+    pip install fonttools brotli uharfbuzz
     python3 scripts/lockup.py .aps-replay-tree/php/public/img/logo.svg \\
         --fonts /opt/aps-conecta-org/gestion/themes/apsconecta/core/fonts
 """
 
 import argparse
 import hashlib
+import io
 import pathlib
 import re
 
+import uharfbuzz as hb
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
 # One row per line of the wordmark: text, font file, pinned axes, size, letter-spacing, centre x,
-# baseline y, fill — the same geometry the live-text lockup had (patch 070's logo.svg).
+# baseline y, fill — 070's baselines, sizes and fills; the second line, its spacing and the
+# centring (without the trailing letter-spacing) are this tool's.
 LINES = (
     (
         "APS Conecta",
@@ -46,66 +53,41 @@ LINES = (
         "#485363",
     ),
 )
-
-
-def pair_kerning(font):
-    """{(left, right): xAdvance} from the GPOS 'kern' feature (PairPos formats 1 and 2)."""
-    kern = {}
-    if "GPOS" not in font:
-        return kern
-    gpos = font["GPOS"].table
-    idx = {
-        i
-        for fr in gpos.FeatureList.FeatureRecord
-        if fr.FeatureTag == "kern"
-        for i in fr.Feature.LookupListIndex
-    }
-    for i in sorted(idx):
-        lookup = gpos.LookupList.Lookup[i]
-        subs = lookup.SubTable
-        if lookup.LookupType == 9:
-            subs = [s.ExtSubTable for s in subs]
-        for st in subs:
-            if getattr(st, "LookupType", 2) != 2:
-                continue
-            firsts = st.Coverage.glyphs
-            if st.Format == 1:
-                for g1, ps in zip(firsts, st.PairSet):
-                    for rec in ps.PairValueRecord:
-                        v = rec.Value1
-                        if v is not None and getattr(v, "XAdvance", 0):
-                            kern.setdefault((g1, rec.SecondGlyph), v.XAdvance)
-            elif st.Format == 2:
-                c1, c2 = st.ClassDef1.classDefs, st.ClassDef2.classDefs
-                for g1 in firsts:
-                    row = st.Class1Record[c1.get(g1, 0)]
-                    for g2, k2 in list(c2.items()):
-                        v = row.Class2Record[k2].Value1
-                        if v is not None and getattr(v, "XAdvance", 0):
-                            kern.setdefault((g1, g2), v.XAdvance)
-    return kern
+COMMENT = re.compile(
+    r"The wordmark is (?:live text over embedded\n.*?never depends on page fonts\.|outlines \(scripts/lockup\.py,\n.*?\.woff2 sha256 [0-9a-f]+\.)",
+    re.S,
+)
 
 
 def line_path(fontfile, axes, text, size, spacing, cx, baseline):
+    raw = TTFont(fontfile)
+    order = (
+        raw.getGlyphOrder()
+    )  # the instancer keeps the glyph order: HarfBuzz ids map onto it
+    raw.flavor = None
+    sfnt = io.BytesIO()
+    raw.save(sfnt)
+    shaper = hb.Font(hb.Face(sfnt.getvalue()))
+    shaper.set_variations(axes)
+    buf = hb.Buffer()
+    buf.add_str(text)
+    buf.guess_segment_properties()
+    hb.shape(shaper, buf)
     font = instantiateVariableFont(TTFont(fontfile), axes, inplace=False)
-    upem = font["head"].unitsPerEm
-    cmap, hmtx, glyphs = font.getBestCmap(), font["hmtx"], font.getGlyphSet()
-    kern = pair_kerning(font)
-    names = [cmap[ord(c)] for c in text]
-    scale = size / upem
-    xs, x = [], 0.0
-    for i, g in enumerate(names):
-        xs.append(x)
-        x += hmtx[g][0] * scale + spacing
-        if i + 1 < len(names):
-            x += kern.get((g, names[i + 1]), 0) * scale
-    width = (
-        x - spacing
-    )  # letter-spacing trails the last glyph in CSS; centre without it
+    glyphs, scale = font.getGlyphSet(), size / font["head"].unitsPerEm
+    placed, x = [], 0.0
+    for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
+        placed.append(
+            (order[info.codepoint], x + pos.x_offset * scale, pos.y_offset * scale)
+        )
+        x += pos.x_advance * scale + spacing
+    width = x - spacing  # CSS letter-spacing trails the last glyph; centre without it
     left = cx - width / 2
     pen = SVGPathPen(glyphs, ntos=lambda v: f"{v:.2f}".rstrip("0").rstrip("."))
-    for g, gx in zip(names, xs):
-        glyphs[g].draw(TransformPen(pen, (scale, 0, 0, -scale, left + gx, baseline)))
+    for name, gx, gy in placed:
+        glyphs[name].draw(
+            TransformPen(pen, (scale, 0, 0, -scale, left + gx, baseline - gy))
+        )
     return pen.getCommands(), width
 
 
@@ -134,23 +116,19 @@ def main():
     svg, n = re.subn(
         r'aria-label="[^"]*"', 'aria-label="APS Conecta Gestión AIO"', svg, count=1
     )
-    assert n == 1
-    old = (
-        "The wordmark is live text over embedded\n       OFL subsets of the same fonts the page ships (the house lockup pattern, gestion\n"
-        "       logo.svg) so this file never fetches anything and never depends on page fonts."
-    )
-    assert svg.count(old) == 1, (
-        "070's lockup comment drifted — update this tool's comment rewrite"
-    )
+    assert n == 1, "no aria-label on the svg"
     sums = ", ".join(
         f"{ff} sha256 {hashlib.sha256((a.fonts / ff).read_bytes()).hexdigest()[:16]}"
         for ff in sorted({line[1] for line in LINES})
     )
-    svg = svg.replace(
-        old,
-        "The wordmark is outlines (scripts/lockup.py,\n       from gestion's brand fonts): a <use> clone cannot carry fonts embedded in this file, so live\n"
-        "       text fell back to whatever the page loaded (R20). Outlines need no font at all.\n"
-        f"       Drawn from {sums}.",
+    note = (
+        "The wordmark is outlines (scripts/lockup.py,\n       from gestion's brand fonts): a <use> clone"
+        " cannot carry fonts embedded in this file, so live\n       text fell back to whatever the page"
+        f" loaded (R20). Outlines need no font at all.\n       Drawn from {sums}."
+    )
+    svg, n = COMMENT.subn(lambda _m: note, svg)
+    assert n == 1, (
+        "the lockup comment drifted from 070's or this tool's own — update COMMENT"
     )
     a.svg.write_text(svg, encoding="utf-8")
 

@@ -548,7 +548,7 @@ lockup_outlines() {  # 120: the banner lockup's wordmark is outlines. A <use> cl
 product_name() {  # 130: «APS Conecta Gestión AIO» on every operator surface (R19). The identity
   # strings, the APS sentence, the buttons and the logo fallback present, the suite's own login
   # link asserted by the test helper, and no «APS Conecta
-  # AIO», «Nextcloud AIO» or «All-in-One» left on any wizard surface. The suite inside is still
+  # AIO», «Nextcloud AIO» or «All-in-One» left in any text file the wizard serves or renders. The suite inside is still
   # Nextcloud — «su Nextcloud» stays (the declaration's nominative use).
   local f s fail=0
   while IFS='|' read -r f s; do
@@ -569,8 +569,7 @@ php/templates/setup.twig|Logotipo de APS Conecta Gestión</text>
 php/templates/login.twig|Logotipo de APS Conecta Gestión</text>
 php/templates/already-installed.twig|Logotipo de APS Conecta Gestión</text>
 EOF
-  if grep -rnE 'APS Conecta AIO|Nextcloud AIO|All-in-One|All-In-One' "$TREE/php/templates" \
-       "$TREE/php/public" --include='*.twig' --include='*.js' --include='*.svg' --include='*.css'; then
+  if grep -rnIE 'APS Conecta AIO|Nextcloud AIO|All-in-One|All-In-One' "$TREE/php/templates" "$TREE/php/public"; then
     echo "  an upstream or pre-Gestión product name survives on a wizard surface" >&2; fail=1
   fi
   [ "$fail" -eq 0 ]
