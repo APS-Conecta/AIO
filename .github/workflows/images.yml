@@ -193,7 +193,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: .   # the Dockerfile copies from repo root (php/, app/, Containers/, community-containers/, aps-bake/ — the bake's materialized output)
+          context: .   # the Dockerfile copies from repo root (php/, app/, Containers/, aps-bake/ — the bake's materialized output)
           file: Containers/nextcloud/Dockerfile
           push: true
           tags: ghcr.io/aps-conecta/aio-nextcloud:${{ inputs.suite-tag }}

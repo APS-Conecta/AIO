@@ -181,6 +181,57 @@ row 030 "the suite's skeleton posture is baked — NC_skeletondirectory="" ENV b
 row 030 "the bake's runtime half is wired — both aps-bake COPY lines and the ENV_PREFIX wiring grep present in the Dockerfile (a regeneration that drops them would otherwise replay green on every other row and ship an unbaked image — the one silently-unbaked-green path nothing else closes)" \
   bake_runtime_wired
 
+# ── L4 S4a: behaviour (R25 community + office, R29 defaults, R28 first-boot calls, R31) ──────
+
+s4_files() {  # PATH... — every file an S4 row reads must exist: a negative arm over a moved file
+  # would pass vacuously (grep's «no such file» reads as «no hit»)
+  local f fail=0
+  for f in "$@"; do [ -f "$f" ] || { echo "  no such file: $f — re-point this row" >&2; fail=1; }; done
+  [ "$fail" -eq 0 ]
+}
+
+# shellcheck disable=SC2016  # the pattern is the entrypoint's own shell text, not an expansion
+s4_install_block() {  # LINE — LINE sits in the entrypoint's fresh-install block: inside the
+  # `installed_version = 0.0.0.0` branch, after `occ maintenance:install`, before the first
+  # `occ maintenance:repair` that follows it (the repair runs the apps' repair steps; the first
+  # cron comes later still)
+  local e="$TREE/Containers/nextcloud/entrypoint.sh" z i r l
+  z="$(grep -nF 'if [ "$installed_version" = "0.0.0.0" ]; then' "$e" | head -1 | cut -d: -f1)"
+  i="$(awk -v z="${z:-0}" 'NR > z && /occ maintenance:install/ {print NR; exit}' "$e")"
+  r="$(awk -v i="${i:-0}" 'NR > i && /occ maintenance:repair$/ {print NR; exit}' "$e")"
+  l="$(grep -nF -e "$1" "$e" | head -1 | cut -d: -f1)"
+  if [ -z "$z" ] || [ -z "$i" ] || [ -z "$r" ] || [ -z "$l" ] || [ "$l" -le "$i" ] || [ "$l" -ge "$r" ]; then
+    echo "  not in the fresh-install block (branch :${z:-?}, install :${i:-?}, line :${l:-?}, repair :${r:-?}): $1" >&2; return 1
+  fi
+}
+
+community_channel_closed() {  # 190: the image ships no community container (R25). The third-party
+  # channel upstream offers next to health data (AzuraCast, Jellyfin, Vaultwarden, …) is closed at
+  # its source: the mastercontainer image creates an EMPTY community-containers directory (DataConst
+  # realpaths it, so it must exist), the page no longer includes the section (a17's own arm) and the
+  # template is gone, the restore note about community backups is gone, and the options script
+  # tolerates the absent form. A crafted community-form POST has nothing to enable:
+  # ConfigurationController keeps only ids the directory lists.
+  local d="$TREE/Containers/mastercontainer/Dockerfile" c="$TREE/php/templates/containers.twig" \
+        j="$TREE/php/public/containers-form-submit.js" fail=0
+  s4_files "$d" "$c" "$j" || return 1
+  if grep -n 'COPY community-containers' "$d"; then echo "  the image still copies upstream's community containers" >&2; fail=1; fi
+  grep -qF 'RUN mkdir -p /var/www/docker-aio/community-containers' "$d" \
+    || { echo "  the image no longer creates the empty community-containers directory DataConst reads" >&2; fail=1; }
+  if grep -nF 'community-containers.twig' "$c"; then echo "  containers.twig still includes the community section" >&2; fail=1; fi
+  if [ -e "$TREE/php/templates/includes/community-containers.twig" ]; then
+    echo "  the community section's template still ships" >&2; fail=1
+  fi
+  if grep -niE 'comunitari' "$c"; then echo "  containers.twig still talks about community containers" >&2; fail=1; fi
+  if grep -nE '^\s*communityFormSubmit\.style' "$j"; then
+    echo "  containers-form-submit.js dereferences the absent community form" >&2; fail=1
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+row 190 "the image ships no community container — an empty directory instead of upstream's set, no community section or template, no community restore note, the options script tolerant of the absent form (R25)" \
+  community_channel_closed
+
 if [ "$fails" -gt 0 ]; then
   echo "ACQUISITION GATE: *** FAIL *** — $fails check(s) failed" >&2
   exit 1

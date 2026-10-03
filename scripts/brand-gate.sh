@@ -96,7 +96,6 @@ swept_table() {  # 060's per-file sentinel table — ONE writer, three readers: 
   cat <<'EOF'
 php/templates/containers.twig|value="Log out"|value="Cerrar sesión"
 php/templates/includes/optional-containers.twig|value="Save changes"|value="Guardar cambios"
-php/templates/includes/community-containers.twig|Community Containers|Contenedores comunitarios
 php/templates/includes/aio-config.twig|Click here to view the current AIO config|Haga clic aquí para ver la configuración actual
 php/templates/includes/backup-dirs.twig|An example for Linux is|Un ejemplo para Linux es
 php/templates/components/container-state.twig|>Stopped</a>|>Detenido</a>
@@ -249,7 +248,7 @@ row 060 "the operator-visible changelog links point at the fork's releases — z
 row 060 "the changelog arms land on APS-Conecta/AIO's releases page (the repoint's positive control)" \
   fork_changelog_present
 
-row 060 "the es-CL sweep left no English on any wizard surface — per-file sentinels gone (16 files: containers, includes, components, small views, public JS)" \
+row 060 "the es-CL sweep left no English on any wizard surface — per-file sentinels gone (15 files: containers, includes, components, small views, public JS)" \
   escl_sweep absent
 
 row 060 "the es-CL sweep landed on every wizard surface — per-file es-CL sentinels present (the sweep's positive control)" \
@@ -671,7 +670,7 @@ post_start_page() {  # 170: after start the page says only true, APS things (R27
   # credentials, the open button, the container list and the page's prose — with the translated
   # suite asserting the bytes it clicks. «Nextcloud» stays only where the page hides it: the
   # Hub-upgrade block (160 empties its switch), the docker socket proxy and HaRP options and the
-  # JS alert behind them (160 hides them while off), and the community-containers section (S4's).
+  # JS alert behind them (160 hides them while off).
   local c="$TREE/php/templates/containers.twig" j="$TREE/php/containers.json" s="$TREE/php/tests/tests" fail=0 want
   s3_files "$c" "$j" "$s/initial-setup.spec.js" "$s/restore-instance.spec.js" || return 1
   while IFS= read -r want; do
@@ -687,7 +686,7 @@ EOF
     echo "  a false or stale statement survives on the post-start page" >&2; fail=1
   fi
   if grep -rn 'Nextcloud' "$TREE/php/templates" "$TREE/php/public"/*.js \
-      | grep -v -e '{#' -e '/includes/community-containers.twig:' \
+      | grep -v -e '{#' \
       | sed -e 's/Nextcloud Hub//g' -e 's/Nextcloud App API//g' -e 's/ExApps de Nextcloud//g' | grep 'Nextcloud'; then
     echo "  «Nextcloud» survives in the wizard's prose" >&2; fail=1
   fi

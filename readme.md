@@ -33,6 +33,7 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 160 | the page offers only what the suite ships — the baked Hub, the suite version, the office card, no ExApp proxies, no «mastercontainer» jargon |
 | 170 | the post-start page: the update path, «Suite en marcha», no Docker prune button (the route stays — zero PHP), the suite's names |
 | 180 | the wizard laid out for a 360 px phone |
+| 190 | no community containers — the image ships none and the page has no section |
 
 **No PHP logic is changed** — the one rule this fork lives by. Every modification is a string,
 an asset, a template, or Dockerfile plumbing, carried as a patch the CI replays and the gates
@@ -61,8 +62,8 @@ these as its own canary that the sweep never bled into PHP.
 
 **Nominative use.** The wizard names itself «APS Conecta Gestión AIO»; translated prose calls the
 software inside it «la suite» — «Nextcloud» remains only in the Hub-upgrade block the page never
-renders, the docker socket proxy and HaRP options (shown only where one is already on), the
-community-containers section and the PHP-borne messages listed above — and the
+renders, the docker socket proxy and HaRP options (shown only where one is already on) and
+the PHP-borne messages listed above — and the
 wizard's help links point at the suite's own docs — gestion's `docs/INSTALLER.md` and
 `docs/GUIA-CLINICA.md`. The image labels are byte-identical upstream,
 deliberately, and both readings are recorded: `org.opencontainers.image.vendor` says
