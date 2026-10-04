@@ -41,6 +41,7 @@ fork-infra paths — into `aps/main`, the tree the images are built from:
 | 233 | an IP accepted as the domain while domain validation is skipped — the install by IP over HTTPS (PHP, declared) |
 | 235 | the installer's own certificate served when one is mounted (`APS_TLS_DIR`, an install by IP); otherwise ACME, as upstream (PHP, declared) |
 | 237 | the test harness's reset removes the Euro-Office container too |
+| 238 | the push server reaches Nextcloud over the internal plain-http listener, not the public URL |
 | 240 | the suite's containers are named `aps-conecta-*` (generated; the wizard stays `nextcloud-aio-mastercontainer`; fresh installs only) |
 
 **PHP logic changes only where declared.** Every other modification is a string, an asset, a
