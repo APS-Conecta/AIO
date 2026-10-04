@@ -40,7 +40,7 @@ https://:8080 {
 
 	@denied {
 		path /api/auth/login /api/auth/getlogin
-		remote_host nextcloud-aio-nextcloud
+		remote_host aps-conecta-nextcloud
 	}
 	abort @denied
 
