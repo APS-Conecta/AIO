@@ -879,6 +879,23 @@ harness_reset_eurooffice() {  # 237: the suite harness's reset removes Euro-Offi
 row 237 "the suite harness's reset removes the Euro-Office container and its two volumes — always on, a running one locked the next wizard's options" \
   harness_reset_eurooffice
 
+push_internal_url() {  # 238: the push server reaches Nextcloud over apache's internal plain-http listener, not the
+  # public URL. By IP (R22) the public URL carries the installer's certificate, which the push container
+  # cannot verify (no CA there; overwrite.cli.url is rewritten on every boot); by domain it saves the
+  # hairpin. The listener is the one Collabora's alias already uses (row 235 pins the block).
+  local j="$TREE/php/containers.json"
+  s3_files "$j" || return 1
+  case "$(sed -n '/"container_name": "aps-conecta-notify-push"/,/"container_name": /p' "$j" | tr -d ' \n')" in
+    *'"NEXTCLOUD_URL=http://aps-conecta-apache.nextcloud-aio:23973",'*) ;;
+    *) echo "  the push server is not pointed at apache's internal listener" >&2; return 1 ;;
+  esac
+  [ "$(grep -cF 'NEXTCLOUD_URL=http://aps-conecta-apache.nextcloud-aio:23973' "$j")" -eq 1 ] \
+    || { echo "  the internal listener is set as NEXTCLOUD_URL on another container too" >&2; return 1; }
+}
+
+row 238 "the push server reaches Nextcloud over apache's internal plain-http listener — no certificate to verify by IP, no hairpin by domain (R22)" \
+  push_internal_url
+
 if [ "$fails" -gt 0 ]; then
   echo "BRAND GATE: *** FAIL *** — $fails row(s) failed" >&2
   exit 1
