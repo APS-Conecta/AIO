@@ -205,6 +205,10 @@ jobs:
     # is trivially green while the daily run actually runs. 7 days: the schedule is daily,
     # so a week of silence means the chore is undone or scheduled runs are failing — either
     # way a human must look, with the ≤6-weeks drift bar still in margin.
+    # Not on the schedule itself: a scheduled run IS the liveness evidence, and the query below
+    # counts whole-run success. Riding the scheduled run made a 7-day gap permanent — liveness
+    # failed the run, so no scheduled run could succeed again (red 2026-10-04 at 9 days).
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
