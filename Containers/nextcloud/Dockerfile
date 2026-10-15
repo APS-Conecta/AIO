@@ -54,8 +54,10 @@ RUN set -ex; \
         icu-dev \
         imagemagick-dev \
         imagemagick-svg \
+# Additional Imagick dependencies 1 start # Do not remove or change this line!
         imagemagick-heic \
         imagemagick-tiff \
+# Additional Imagick dependencies 1 end # Do not remove or change this line!
         libevent-dev \
         libjpeg-turbo-dev \
         libmcrypt-dev \
@@ -214,7 +216,7 @@ RUN set -ex; \
     ; \
 # imap was removed from PHP core in 8.4, so it needs to be installed from PECL from now on
     pecl install -D 'with-kerberos="yes" with-imap-ssl="yes"' imap-1.0.3; \
-    pecl install smbclient; \
+    pecl install smbclient-1.1.2; \
     docker-php-ext-enable imap smbclient; \
     \
     runDeps="$( \
@@ -240,8 +242,10 @@ RUN set -ex; \
         bind-tools \
         imagemagick \
         imagemagick-svg \
+# Additional Imagick dependencies 2 start # Do not remove or change this line!
         imagemagick-heic \
         imagemagick-tiff \
+# Additional Imagick dependencies 2 end # Do not remove or change this line!
         coreutils; \
     \
     grep -q '^pm = dynamic' /usr/local/etc/php-fpm.d/www.conf; \
